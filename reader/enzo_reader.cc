@@ -140,6 +140,7 @@ long enzo_reader (paramfile &params, std::vector<particle_sim> &points)
 
 #ifdef MESHMERGER
    std::vector< vector <float> > colors;
+   std::vector< vector <int> > petiles;
 
 // define the quantities to be stored in the 
    int * color = new int [numberoffields];
@@ -168,8 +169,6 @@ long enzo_reader (paramfile &params, std::vector<particle_sim> &points)
    H5Pclose(fapl_id);
 
 #endif
-
-
 
    string hierarchyname = params.find<string>("hierarchy_file");
    int sf[numberoffields];
@@ -334,7 +333,7 @@ long enzo_reader (paramfile &params, std::vector<particle_sim> &points)
 
    if(nfiles < npes)
    {
-      printf("Only the case with a number of MPI processes less or equal than files is supported\n");
+      printf("Only the case with a number of MPI processes less or equal than the number of tiles is supported\n");
       printf("NPES = %d, Nfiles = %d, aborting...\n", npes, nfiles);
       exit(11);
    }
@@ -364,8 +363,10 @@ long enzo_reader (paramfile &params, std::vector<particle_sim> &points)
 
 #ifdef MESHMERGER
 // Preprocessing stage
+// calculate total data size
 
-   long pesize = 0;
+   long totalsize=0;
+   long distsize=0;
    for (int i=0; i<nfiles; i++)
      {
 
@@ -374,16 +375,55 @@ long enzo_reader (paramfile &params, std::vector<particle_sim> &points)
         for (int j=0; j<nrank; j++) fscanf(pFile, "%lf", &leftside[2-j]);
         for (int j=0; j<nrank; j++) fscanf(pFile, "%lf", &rightside[2-j]);
         fscanf (pFile, "%s", datafilename);
-        if(i < istart_pe || i >= iend_pe)continue;
-
-        pesize += (rbox[2]-lbox[2]+1)*(rbox[1]-lbox[1]+1)*(rbox[0]-lbox[0]+1);
+        totalsize += (rbox[2]-lbox[2]+1)*(rbox[1]-lbox[1]+1)*(rbox[0]-lbox[0]+1);
 
      }
+   fseek (pFile , sizeof(nfiles) , SEEK_SET );
+   distsize = ceil( float(totalsize)/float(npes));
+   //cout << "GLOBAL SIZE = " << totalsize << " " << " AVG SIZE = " << distsize << endl; 
 
-// calculate global data size 
-   long totalsize;
-   MPI_Allreduce(&pesize, &totalsize, 1, MPI_LONG, MPI_SUM, MPI_COMM_WORLD);
-   //cout << " MYPE = " << mype << " SIZE IS = " << totalsize << endl;
+// assign tiles to processors to balance the work
+
+   petiles.resize(npes);
+   for (int kk=0; kk<npes; kk++)petiles[kk].resize(nfiles);
+   for (int kk=0; kk<npes; kk++)
+     for (int jj=00; jj<nfiles; jj++)petiles[kk][jj]=-1;
+
+   long pesize = 0;
+   long pesizeaux = 0;
+   int ii0 = 0;
+   int jj0 = 0;
+   int totaux = totalsize;
+   for (int i=0; i<nfiles; i++)
+     {
+
+        for (int j=0; j<nrank; j++) fscanf(pFile, "%d", &lbox[2-j]);
+        for (int j=0; j<nrank; j++) fscanf(pFile, "%d", &rbox[2-j]);
+        for (int j=0; j<nrank; j++) fscanf(pFile, "%lf", &leftside[2-j]);
+        for (int j=0; j<nrank; j++) fscanf(pFile, "%lf", &rightside[2-j]);
+        fscanf (pFile, "%s", datafilename);
+        //if(i < istart_pe || i >= iend_pe)continue;
+        //pesize += (rbox[2]-lbox[2]+1)*(rbox[1]-lbox[1]+1)*(rbox[0]-lbox[0]+1);
+
+        pesizeaux += (rbox[2]-lbox[2]+1)*(rbox[1]-lbox[1]+1)*(rbox[0]-lbox[0]+1);
+        if(ii0 == mype)petiles[ii0][jj0] = i;
+        jj0++;
+        if(pesizeaux > distsize || i == nfiles-1)
+          {
+            totaux -= pesizeaux;
+            if(ii0 == mype)pesize=pesizeaux;
+            jj0=0;
+            ii0++;
+            pesizeaux=0;
+            if(i != npes-1)distsize = ceil( float(totaux)/float(npes-ii0));
+          }
+     }
+ 
+
+   //for (int kk=0; kk<npes; kk++)
+     //for (int jj=00; jj<nfiles; jj++)cout << kk << " " << mype << " " << petiles[kk][jj] << endl;
+
+
 // send to next processor the starting point
    long * sizearray = new long [npes];
    long * sizearray_tot = new long [npes];
@@ -398,7 +438,7 @@ long enzo_reader (paramfile &params, std::vector<particle_sim> &points)
    for (int jj=0; jj<mype; jj++)startpesize += sizearray_tot[jj];
    endpesize = startpesize+pesize-1;
 
-   //cout << "MYPE = " << mype << " LEFT = " << startpesize << " RIGHT = " << pesize-1 << endl;
+   cout << "MYPE = " << mype << " LEFT = " << startpesize << " RIGHT = " << pesize << endl;
 
 // create the full dataspace
    hid_t outspace;
@@ -453,6 +493,7 @@ long enzo_reader (paramfile &params, std::vector<particle_sim> &points)
    fseek (pFile , sizeof(nfiles) , SEEK_SET );
      
 // allocate the vectors
+   for (int ii=0; ii<activefields+4; ii++)colors[ii].resize(pesize);
    for (int ii=0; ii<activefields+4; ii++)colors[ii].resize(pesize);
 
 #endif
@@ -526,7 +567,12 @@ long enzo_reader (paramfile &params, std::vector<particle_sim> &points)
 
 // next iteration if block is not assigned to the processor
 
-        if(i < istart_pe || i >= iend_pe)continue;
+        int mycheck=0;
+        for (int jj=0; jj<nfiles; jj++)
+            if(petiles[mype][jj] == i)mycheck=1;
+        if(!mycheck)continue;
+
+        //if(i < istart_pe || i >= iend_pe)continue;
 
         printf("BOX = %d, LEVEL = %d\n", i, nlevelbox);
         if(nlevelbox > maxlevel) continue;
@@ -770,8 +816,8 @@ long enzo_reader (paramfile &params, std::vector<particle_sim> &points)
 
 // write data in file
 
-   for(int ii=0; ii<10; ii++)
-      cout << colors[0][ii] << " " << colors[1][ii] << " " << colors [2][ii] << " " << colors [3][ii] << endl;
+   //for(int ii=0; ii<10; ii++)
+   //   cout << colors[0][ii] << " " << colors[1][ii] << " " << colors [2][ii] << " " << colors [3][ii] << endl;
 
    float * pointsaux = new float [pesize];
 
@@ -820,7 +866,7 @@ long enzo_reader (paramfile &params, std::vector<particle_sim> &points)
    fclose (pFile);
 
 #ifdef MESHMERGER
-   cout << "Data saved in " << outfile.c_str() << endl;
+   if(mype == 0)cout << "Data saved in " << outfile.c_str() << endl;
    exit (21);
 #endif
 
