@@ -1,0 +1,18 @@
+############################
+# Input Options
+############################
+
+# This file can be downloaded from
+# http://www.mpa-garching.mpg.de/~kdolag/Splotch/Source/snap_092.gz
+# You'll have to unzip it afterwards
+infile=snap_092
+
+# 0,1: plain binary file, 2: Gadget2, 3: Enzo, 4: millenium, 5: mpiio,
+# 6: mesh reader, 7: hdf5
+simtype=2
+
+# Additional flags for Gadget
+ptypes=0
+AnalyzeSimulationOnly=TRUE
+
+

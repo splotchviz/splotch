@@ -1,0 +1,102 @@
+/*
+ ============================================================================
+ Name        : README
+ Author      : Gian Franco Marras
+ Version     : 1.0
+ Copyright   : free
+ Description : A simple MPI I/O Library for file access in parallel system
+ ============================================================================
+*/
+
+INDEX:
+1) HOW TO INSTALL
+2) Documentation
+3) Examples
+
+#######################################
+1) HOW TO INSTALL
+#######################################
+
+./configure [--prefix=...]
+make
+make install
+
+#######################################
+2) Documentation
+#######################################
+This library adopts standard MPI2 I/O functions to obtain high performance, scalable data access utilities.
+With this approach, parallel MPI processes have different views of individual files that allows simultaneous and collective writing/reading operations on non-contiguous interleaved data of the same data type.
+In our approach we see the data on file organized in matrix structure (i.e. n-dimensional blocks), these are to be read and distributed among processes belonging to a communicator with cartesian topology.
+The same strategy is adopted for writing. 
+
+Library functions are listed below:
+a) MPI_Ajo_partition	: provides the mapping functionality between the global matrix and the processes set.
+
+b) MPI_Ajo_write	: collective writing operation to the file 
+
+c) MPI_Ajo_read		: collective reading operation from the file.
+
+A full description of functions and their parameters is provided by a man command.
+
+To enable this command export the environment variable MANPATH:
+
+export MANPATH=$MANPATH:[install_directory]/man  (for Bourne Shell Family)
+setenv MANPATH $MANPATH:[install_directory]/man  (for C shell Family)
+
+#######################################
+3) Examples 
+#######################################
+I/O operations performed on a single file whose data are structured in a 2-dimensional 100x110 matrix, by 24 processes organized according to a 2-dimensional 4x6 grid.
+
+a) Writing:
+
+#include <mpi.h>
+#include "partition.h"
+...
+{
+...;
+ierr = MPI_Init ( &argc, &argv );
+ierr = MPI_Comm_rank ( MPI_COMM_WORLD, &my_rank );
+ierr = MPI_Comm_size ( MPI_COMM_WORLD, &nprocs );
+...;
+ndim_array=2;
+psize[0]=4;  psize[1]=6;
+nsize_global[0]=100; nsize_global[1]=110;
+...;
+ierr = MPI_Ajo_partition ( MPI_COMM_WORLD, my_rank, ndim_array, nsize_global, psize, nsize, start_global_array);
+...;
+ntot_byte=nsize_global[0]*nsize_global[1]*sizeof(float);
+for(i=0,i<ntime;++i)
+{
+   disp=i*ntot_byte;
+   ...;
+   ierr = MPI_Ajo_write ( MPI_COMM_WORLD, my_rank, “filename.bin”, 
+   ndim_array, nsize_global, nsize, start_global_array, MPI_FLOAT, array, disp );  
+}
+ 
+b) Reading: 
+ 
+#include <mpi.h>
+#include "partition.h"
+...
+{
+...;
+ierr = MPI_Init ( &argc, &argv );
+ierr = MPI_Comm_rank ( MPI_COMM_WORLD, &my_rank );
+ierr = MPI_Comm_size ( MPI_COMM_WORLD, &nprocs );
+...;
+ndim_array=2;
+psize[0]=4;  psize[1]=6; 
+nsize_global[0]=100; nsize_global[1]=110;
+ntot_byte=nsize_global[0]*nsize_global[1]*sizeof(float);
+...;
+ierr = MPI_Ajo_partition ( MPI_COMM_WORLD, my_rank, ndim_array, nsize_global, psize, nsize, start_global_array);
+...;
+for(i=0,i<ntime;++i){
+   disp=i*ntot_byte;
+   ...;
+   ierr = MPI_Ajo_read ( MPI_COMM_WORLD, my_rank, “filename.bin”, 
+   ndim_array, nsize_global, nsize, start_global_array, MPI_FLOAT, array, disp );  
+}
+
+#######################################

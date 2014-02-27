@@ -1,0 +1,20 @@
+############################
+# Input Options
+############################
+
+# don't read data 
+simtype=-1
+
+############################
+# Output Options
+############################
+
+# 0: TGA uncompressed, 1: PPM ASCII, 2: PPM binary, 3: TGA runlength-compressed
+pictype=0
+outfile=Tipsy.tga
+xres=600
+yres=10
+
+colorbar=TRUE
+
+palette0=palettes/Tipsy.pal

@@ -1,0 +1,112 @@
+############################
+# Input Options
+############################
+
+# This file can be downloaded from
+# http://www.mpa-garching.mpg.de/~kdolag/Splotch/Source/snap_092.gz
+# You'll have to unzip it afterwards
+infile=snap_
+fidx=92
+
+# 0,1: plain binary file, 2: Gadget2, 3: Enzo, 4: millenium, 5: mpiio,
+# 6: mesh reader, 7: hdf5
+simtype=2
+snapshot_spacing=1
+#snapdir=FALSE
+periodic=FALSE
+
+# Additional flags for Gadget
+numfiles=1
+#swap_endian=TRUE
+ptypes=2
+ptype0=0
+ptype1=4
+
+# labels to visualize('XXXX','TEMP','U','RHO','MACH','DTEG','DISS')
+size_fix0=0
+size_label0=HSML
+size_present0=1
+size_fac0=0.5
+intensity_label0=RHO
+intensity_present0=0
+intensity_min0=-11.8784
+intensity_max0=-1.44456
+color_label0=U
+color_present0=1
+color_is_vector0=FALSE
+color_log0=TRUE
+color_min0=0.152815
+color_max0=6.29244
+
+size_fix1=0
+size_label1=HSMS
+size_present1=1
+size_fac1=0.5
+intensity_label1=XXXX
+intensity_present1=0
+color_label1=AGE
+color_present1=1
+color_is_vector1=FALSE
+color_log1=TRUE
+color_min1=-1.34248
+color_max1=0
+
+############################
+# Output Options
+############################
+
+# 0: TGA uncompressed, 1: PPM ASCII, 2: PPM binary, 3: TGA runlength-compressed
+pictype=0
+outfile=demo
+xres=800
+
+gray_absorption=0.0001
+colorbar=TRUE
+
+############################
+# Visualization properties
+############################
+a_eq_e=t
+
+# 0: nosort, 1: by z, 2: by value, 3: by reversed value, 4: by size
+sort_type=1
+
+minrad_pix = 1
+
+palette0=palettes/OldSplotch.pal
+brightness0=10.5
+
+palette1=palettes/OldSplotch.pal #palettes/M51.pal
+brightness1=1.5
+
+############################
+# Geometrical setup
+############################
+camera_x=      3244.4
+camera_y=      25289.3
+camera_z=      4764.7
+lookat_x=      -2000
+lookat_y=      5289.3
+lookat_z=      4764.7
+sky_x=0
+sky_y=0
+sky_z=1
+
+fov=30
+
+#EyeSeparation = 0.8
+
+############################
+# CUDA SETUP
+############################
+#number of GPUs to use
+gpu_number =1
+#number of cores per node (it is required if gpu_number > 1)
+#cores_number =12
+
+# ALGORITHM PARAMETERS
+#width of the boundary around the image tile (default=8)
+tile_boundary_width = 8
+# x and y side dimension of the image tile, in terms of pixels (default=12)
+tile_x-side=12 
+tile_y-side=12

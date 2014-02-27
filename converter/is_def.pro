@@ -1,0 +1,4 @@
+FUNCTION IS_DEF, x
+aux = SIZE(x)
+RETURN, aux(N_ELEMENTS(aux)-2) NE 0
+END

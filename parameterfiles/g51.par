@@ -1,0 +1,134 @@
+############################
+# Input Options
+############################
+infile=snap_092
+ptypes=2
+
+# 0,1: plain binary file, 2: Gadget2, 3: Enzo
+simtype=2
+
+# In case of interpolating between snaps
+snap_start = 90
+snap_interpol = 8
+
+# Additional flags for Gadget
+numfiles=1
+readparallel=1
+swap_endian=TRUE
+id_label=IDU
+
+# labels to visualize('XXXX','TEMP','U','RHO','MACH','DTEG','DISS','VEL')
+ptype0=0
+size_fix0=0
+size_label0=HSML
+size_present0=1
+size_fac0=0.5
+color_label0=U
+color_present0=1
+color_is_vector0=FALSE
+#color_fac0=1e5
+intensity_label0=XXXX
+intensity_present0=1
+
+ptype1=4
+size_fix1=0
+size_label1=HSMS
+size_present1=16
+size_fac1=0.5
+color_label1=AGE
+color_present1=16
+color_is_vector1=FALSE
+#color_fac1=1e5
+intensity_label1=XXXX
+intensity_present1=16
+
+
+# Additinal flags for Enzo
+
+############################
+# Output Options
+############################
+pictype=0
+outfile=Ersol-result.tga
+resolution=800
+#ycut0=100
+#ycut1=700
+
+colorbar=TRUE
+
+############################
+# Vizualization properties
+############################
+boostcolors=FALSE
+a_eq_e=TRUE
+# 0: nosort, 1: by z, 2: by value, 3: by reversed value, 4: by size 
+sort_type=0
+
+intensity_log0=FALSE
+color_log0=TRUE
+color_asinh0=FALSE
+#color_min0=10.0
+#color_max0=16.0
+palette0=palettes/OldSplotch.pal
+brightness0=3.0                # 3.0
+gray_absorption0=0.5
+
+intensity_log1=FALSE
+color_log1=FALSE
+color_asinh1=FALSE
+color_min1=0.1
+color_max1=0.5
+palette1=palettes/OrionNew1.pal
+brightness1=10.0                # 10.0
+gray_absorption1=0.5
+
+
+
+
+############################
+# Geometrical setup
+############################
+#alternative read values from file
+geometry_file=mygeometry_r.dat
+geometry_start=0
+geometry_incr=1
+#or take give values explicitely
+camera_x=      -2000.0
+camera_y=      15000.0
+camera_z=      -2000.0
+lookat_x=      -3606.6 
+lookat_y=      3029.6
+lookat_z=      2961.9
+sky_x=0
+sky_y=0
+sky_z=1
+
+
+fov=30
+#zmin=5000.0
+#zmax=7000.0
+
+############################
+# CUDA SETUP
+############################
+#the maximun pixels in a rendering task
+max_region =800			
+
+#the size of fragment buffer in Megabyte
+graphics_memory_size =900
+fragment_buffer_size =400
+
+#the size of a CUDA block
+#block_size =512
+
+#number of GPUs to use
+gpu_number = 1
+
+#the following is for testing now
+test_load_balancing=false
+gpu_load0=14
+gpu_load1=86
+
+#gpu_load0=40 if one card used
+use_host_as_thread = true
+host_load = 70
