@@ -25,7 +25,7 @@
 /*! \file ls_image.h
  *  Classes for creation and output of image files
  *
- *  Copyright (C) 2003-2012 Max-Planck-Society
+ *  Copyright (C) 2003-2015 Max-Planck-Society
  *  \author Martin Reinecke, David Larson
  */
 
@@ -38,61 +38,28 @@
 #include <algorithm>
 #include "arr.h"
 #include "datatypes.h"
+#include "colour.h"
+#include "linear_map.h"
 
 /*! \defgroup imagegroup Image creation */
 /*! \{ */
 
-/*! A very simple class for storing RGB colours. */
-class Colour
-  {
-  public:
-    float r, /*!< the red component */
-          g, /*!< the green component */
-          b; /*!< the blue component */
-
-    /*! Default constructor. Does not initialize \a r, \a g and \a b. */
-    Colour() {}
-    /*! Initializes the colour with \a R, \a G and \a B. */
-    Colour (float R, float G, float B) : r(R), g(G), b(B) {}
-    /*! Multiplies all components with \a fact. */
-    const Colour &operator*= (float fact)
-      { r*=fact; g*=fact; b*=fact; return *this; }
-    /*! Returns the sum colour of \a *this and \a c2. */
-    const Colour operator+ (const Colour &c2) const
-      { return Colour(r+c2.r, g+c2.g, b+c2.b); }
-    /*! Returns \a *this, scaled by \a f. */
-    const Colour operator* (double f) const
-      { return Colour(float(r*f), float(g*f), float(b*f)); }
-  };
-
 /*! A class for mapping floting-point values into colours. */
-class Palette
+class Palette: public linearMap<Colour>
   {
-  private:
-    std::vector<Colour> cv;
-    std::vector<float> fv;
-
   public:
     /*! Adds a new data point \a f, with the corresponding colour \a c.
         The additions must be done in the order of ascending \a f. */
     void add (float f, const Colour &c)
-      {
-      fv.push_back(f);
-      cv.push_back(c);
-      }
+      { addVal (f, c); }
+    void addb (uint8 f, uint8 r,uint8 g, uint8 b)
+      { addVal (f, Colour(r/255.,g/255.,b/255.)); }
     /*! Sets the palette to the predefined palette \a num. */
     void setPredefined(int num);
     /*! Returns the colour corresponding to the value \a f. The colour is
         determined by linear interpolation between neighbouring data points. */
     Colour Get_Colour (float f) const
-      {
-      if (f<=fv[0]) return cv[0];
-      if (f>=fv[fv.size()-1]) return cv[cv.size()-1];
-      int i=0;
-      while (f>fv[i]) ++i;
-      return cv[i-1]*((fv[i]-f)/(fv[i]-fv[i-1]))
-           + cv[i]*((f-fv[i-1])/(fv[i]-fv[i-1]));
-      }
+      { return getVal_const(f); }
   };
 
 class Colour8

@@ -25,7 +25,7 @@
 /*! \file math_utils.h
  *  Various convenience mathematical functions.
  *
- *  Copyright (C) 2002-2013 Max-Planck-Society
+ *  Copyright (C) 2002-2015 Max-Planck-Society
  *  \author Martin Reinecke
  */
 
@@ -133,11 +133,11 @@ template<typename I> inline int ilog2 (I arg)
     return 8*sizeof(long long)-1-__builtin_clzll(arg);
 #endif
   int res=0;
-  while (arg > 0x0000FFFF) { res+=16; arg>>=16; }
-  if (arg > 0x000000FF) { res|=8; arg>>=8; }
-  if (arg > 0x0000000F) { res|=4; arg>>=4; }
-  if (arg > 0x00000003) { res|=2; arg>>=2; }
-  if (arg > 0x00000001) { res|=1; }
+  while (arg > 0xFFFF) { res+=16; arg>>=16; }
+  if (arg > 0x00FF) { res|=8; arg>>=8; }
+  if (arg > 0x000F) { res|=4; arg>>=4; }
+  if (arg > 0x0003) { res|=2; arg>>=2; }
+  if (arg > 0x0001) { res|=1; }
   return res;
   }
 
@@ -154,12 +154,24 @@ template<typename I> inline int ilog2_nonnull (I arg)
   return ilog2 (arg);
   }
 
-/*! Returns the number of bits needed to encode a value in the range
-    [0; \a arg] */
-template<typename I> int nbits(I arg)
+template<typename I> inline int trailingZeros(I arg)
   {
-  if (arg<=1) return 0;
-  return 1+ilog2(arg-1);
+  if (arg==0) return sizeof(I)<<3;
+#ifdef __GNUC__
+  if (sizeof(I)<=sizeof(int))
+    return __builtin_ctz(arg);
+  if (sizeof(I)==sizeof(long))
+    return __builtin_ctzl(arg);
+  if (sizeof(I)==sizeof(long long))
+    return __builtin_ctzll(arg);
+#endif
+  int res=0;
+  while ((arg&0xFFFF)==0) { res+=16; arg>>=16; }
+  if ((arg&0x00FF)==0) { res|=8; arg>>=8; }
+  if ((arg&0x000F)==0) { res|=4; arg>>=4; }
+  if ((arg&0x0003)==0) { res|=2; arg>>=2; }
+  if ((arg&0x0001)==0) { res|=1; }
+  return res;
   }
 
 /*! Returns \a atan2(y,x) if \a x!=0 or \a y!=0; else returns 0. */
@@ -190,6 +202,9 @@ template<typename T, typename Iter> inline void interpol_helper
   { interpol_helper (begin,end,val,std::less<T>(),idx,frac); }
 
 /*! \} */
+
+template<typename T> inline bool multiequal (const T &a, const T &b)
+  { return (a==b); }
 
 template<typename T> inline bool multiequal (const T &a, const T &b, const T &c)
   { return (a==b) && (a==c); }
@@ -222,5 +237,15 @@ template<typename T> class kahan_adder
       }
     T result() const { return sum; }
   };
+
+template<typename Iter> bool checkNan (Iter begin, Iter end)
+  {
+  while (begin!=end)
+    {
+    if (*begin != *begin) return true;
+    ++begin;
+    }
+  return false;
+  }
 
 #endif

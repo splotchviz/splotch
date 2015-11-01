@@ -25,7 +25,7 @@
 /*! \file arr.h
  *  Various high-performance array classes used by the Planck LevelS package.
  *
- *  Copyright (C) 2002-2012 Max-Planck-Society
+ *  Copyright (C) 2002-2015 Max-Planck-Society
  *  \author Martin Reinecke
  */
 
@@ -174,10 +174,9 @@ template <typename T, tsize sz> class fix_arr
 
 
 /*! One-dimensional array type, with selectable storage management. */
-template <typename T, typename storageManager> class arrT: public arr_ref<T>
+template <typename T, typename stm> class arrT: public arr_ref<T>
   {
   private:
-    storageManager stm;
     bool own;
 
     void reset()
@@ -187,10 +186,10 @@ template <typename T, typename storageManager> class arrT: public arr_ref<T>
     /*! Creates a zero-sized array. */
     arrT() : arr_ref<T>(0,0), own(true) {}
     /*! Creates an array with \a sz entries. */
-    explicit arrT(tsize sz) : arr_ref<T>(stm.alloc(sz),sz), own(true) {}
+    explicit arrT(tsize sz) : arr_ref<T>(stm::alloc(sz),sz), own(true) {}
     /*! Creates an array with \a sz entries, and initializes them with
         \a inival. */
-    arrT(tsize sz, const T &inival) : arr_ref<T>(stm.alloc(sz),sz), own(true)
+    arrT(tsize sz, const T &inival) : arr_ref<T>(stm::alloc(sz),sz), own(true)
       { this->fill(inival); }
     /*! Creates an array with \a sz entries, which uses the memory pointed
         to by \a ptr.
@@ -206,10 +205,10 @@ template <typename T, typename storageManager> class arrT: public arr_ref<T>
     arrT (T *ptr, tsize sz): arr_ref<T>(ptr,sz), own(false) {}
     /*! Creates an array which is a copy of \a orig. The data in \a orig
         is duplicated. */
-    arrT (const arrT &orig): arr_ref<T>(stm.alloc(orig.s),orig.s), own(true)
+    arrT (const arrT &orig): arr_ref<T>(stm::alloc(orig.s),orig.s), own(true)
       { for (tsize m=0; m<this->s; ++m) this->d[m] = orig.d[m]; }
     /*! Frees the memory allocated by the object. */
-    ~arrT() { if (own) stm.dealloc(this->d); }
+    ~arrT() { if (own) stm::dealloc(this->d); }
 
     /*! Allocates space for \a sz elements. The content of the array is
         undefined on exit. \a sz can be 0. If \a sz is the
@@ -217,9 +216,9 @@ template <typename T, typename storageManager> class arrT: public arr_ref<T>
     void alloc (tsize sz)
       {
       if (sz==this->s) return;
-      if (own) stm.dealloc(this->d);
+      if (own) stm::dealloc(this->d);
       this->s = sz;
-      this->d = stm.alloc(sz);
+      this->d = stm::alloc(sz);
       own = true;
       }
     /*! Allocates space for \a sz elements. If \a sz is the
@@ -229,7 +228,7 @@ template <typename T, typename storageManager> class arrT: public arr_ref<T>
       { alloc(sz); this->fill(inival); }
     /*! Deallocates the memory held by the array, and sets the array size
         to 0. */
-    void dealloc() {if (own) stm.dealloc(this->d); reset();}
+    void dealloc() {if (own) stm::dealloc(this->d); reset();}
     /*! Resizes the array to hold \a sz elements. The existing content of the
         array is copied over to the new array to the extent possible.
         \a sz can be 0. If \a sz is the same as the current size, no
@@ -238,10 +237,10 @@ template <typename T, typename storageManager> class arrT: public arr_ref<T>
       {
       using namespace std;
       if (sz==this->s) return;
-      T *tmp = stm.alloc(sz);
+      T *tmp = stm::alloc(sz);
       for (tsize m=0; m<min(sz,this->s); ++m)
         tmp[m]=this->d[m];
-      if (own) stm.dealloc(this->d);
+      if (own) stm::dealloc(this->d);
       this->s = sz;
       this->d = tmp;
       own = true;
@@ -281,7 +280,7 @@ template <typename T, typename storageManager> class arrT: public arr_ref<T>
         \note On exit, \a other is zero-sized! */
     void transfer (arrT &other)
       {
-      if (own) stm.dealloc(this->d);
+      if (own) stm::dealloc(this->d);
       this->d=other.d;
       this->s=other.s;
       own=other.own;
@@ -359,6 +358,10 @@ template <typename T, typename storageManager> class arr2T
       : s1(sz1), s2(sz2), d(s1*s2) {}
     /*! Creates an array with the dimensions  \a sz1 and \a sz2
         and initializes them with \a inival. */
+    /*! Creates an array with the dimensions \a sz1 and \a sz2 from existing
+        pointer. */
+    arr2T(T* p, tsize sz1, tsize sz2)
+      : s1(sz1), s2(sz2), d(p, s1*s2) {}
     arr2T(tsize sz1, tsize sz2, const T &inival)
       : s1(sz1), s2(sz2), d (s1*s2)
       { fill(inival); }
@@ -475,6 +478,9 @@ template <typename T>
     arr2() : arr2T<T,normalAlloc__<T> > () {}
     /*! Creates an array with the dimensions \a sz1 and \a sz2. */
     arr2(tsize sz1, tsize sz2) : arr2T<T,normalAlloc__<T> > (sz1,sz2) {}
+    /*! Creates an array with the dimensions \a sz1 and \a sz2 from existing
+        pointer. */
+    arr2(T* p, tsize sz1, tsize sz2) : arr2T<T,normalAlloc__<T> > (p,sz1,sz2) {}
     /*! Creates an array with the dimensions  \a sz1 and \a sz2
         and initializes them with \a inival. */
     arr2(tsize sz1, tsize sz2, const T &inival)

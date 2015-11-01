@@ -25,7 +25,7 @@
 /*
  *  This file contains functionality related to wall-clock timers
  *
- *  Copyright (C) 2010, 2011, 2012 Max-Planck-Society
+ *  Copyright (C) 2010-2014 Max-Planck-Society
  *  Author: Martin Reinecke
  */
 
@@ -37,6 +37,8 @@
 #include "walltimer.h"
 #include "walltime_c.h"
 #include "error_handling.h"
+#include "mpi_support.h"
+#include "sort_utils.h"
 
 using namespace std;
 
@@ -125,6 +127,16 @@ struct timecomp
   bool operator() (const Tipair &a, const Tipair &b) const
     { return a.second>b.second; }
   };
+struct timecomp2
+  {
+  bool operator() (const double &a, const double &b) const
+    { return a>b; }
+  };
+struct namecomp
+  {
+  bool operator() (const Tipair &a, const Tipair &b) const
+    { return a.first->first<b.first->first; }
+  };
 
 void tstack_report(const tstack_node &node, const string &indent, int twidth,
   int slen)
@@ -149,6 +161,40 @@ void tstack_report(const tstack_node &node, const string &indent, int twidth,
       }
     printf("%s+- %-*s:%6.2f%% (%*.4fs)\n%s\n",indent.c_str(),slen,
       "<unaccounted>",100*(total-tsum)/total,twidth,total-tsum,indent.c_str());
+    }
+  }
+
+void tstack_report_mpi (const tstack_node &node, const string &indent,
+  int twidth, int slen)
+  {
+  vector<Tipair> tmp;
+  for (Tci it=node.child.begin(); it!=node.child.end(); ++it)
+    tmp.push_back(make_pair(it,it->second.wt.acc()));
+
+  if (tmp.size()>0)
+    {
+    sort(tmp.begin(),tmp.end(),namecomp());
+    arr<double> times(tmp.size());
+    for (tsize i=0; i<tmp.size(); ++i)
+      times[i]=tmp[i].second;
+    mpiMgr.allreduce(times,MPI_Manager::Sum);
+    vector<int> idx;
+    buildIndex(times.begin(),times.end(),idx,timecomp2());
+    if (mpiMgr.master()) printf("%s|\n", indent.c_str());
+    for (unsigned ii=0; ii<tmp.size(); ++ii)
+      {
+      unsigned i=idx[ii];
+      double tmin=tmp[i].second,tmax=tmp[i].second,tavg=tmp[i].second;
+      mpiMgr.allreduce(tmin,MPI_Manager::Min);
+      mpiMgr.allreduce(tmax,MPI_Manager::Max);
+      mpiMgr.allreduce(tavg,MPI_Manager::Sum);
+      tavg/=mpiMgr.num_ranks();
+      if (mpiMgr.master()) printf("%s+- %-*s: %*.4f/%*.4f/%*.4fs\n",
+        indent.c_str(),slen,(tmp[i].first->first).c_str(),twidth,
+        tmin,twidth,tmax,twidth,tavg);
+      tstack_report_mpi(tmp[i].first->second,indent+"|  ",twidth,slen);
+      }
+    if (mpiMgr.master()) printf("%s\n",indent.c_str());
     }
   }
 
@@ -222,4 +268,24 @@ void tstack_report(const string &stem)
   tstack_report(*ptr,"",logtime+5,slen);
 
   printf("\nAccumulated timing overhead: approx. %1.4fs\n",overhead);
+  }
+
+void tstack_report_mpi(const string &stem)
+  {
+  const tstack_node *ptr = 0;
+  for (Tci it=tstack_root.child.begin(); it!=tstack_root.child.end(); ++it)
+    if (it->first==stem) ptr=&(it->second);
+  planck_assert(ptr,"invalid stem");
+  int slen=string("<unaccounted>").size();
+  slen = max(slen,ptr->max_namelen());
+
+  double total=ptr->wt.acc();
+  if (mpiMgr.master())
+    printf("\nTotal wall clock time for '%s': %1.4fs\n",stem.c_str(),total);
+
+  int logtime=max(1,int(log10(total)+1));
+  tstack_report_mpi(*ptr,"",logtime+5,slen);
+
+  if (mpiMgr.master())
+    printf("\nAccumulated timing overhead: approx. %1.4fs\n",overhead);
   }

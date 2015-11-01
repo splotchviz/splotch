@@ -25,7 +25,7 @@
 /*! \file walltimer.h
  *  Functionality related to wall-clock timers
  *
- *  Copyright (C) 2010, 2011 Max-Planck-Society
+ *  Copyright (C) 2010-2014 Max-Planck-Society
  *  \author Martin Reinecke
  */
 
@@ -91,5 +91,6 @@ void tstack_pop();
 void tstack_replace(const std::string &name1, const std::string &name2);
 void tstack_replace(const std::string &name);
 void tstack_report(const std::string &stem);
+void tstack_report_mpi(const std::string &stem);
 
 #endif

@@ -23,7 +23,7 @@
  */
 
 /*
- *  Copyright (C) 2009-2011 Max-Planck-Society
+ *  Copyright (C) 2009-2014 Max-Planck-Society
  *  \author Martin Reinecke
  */
 
@@ -57,6 +57,9 @@ MPI_Datatype ndt2mpi (NDT type)
   switch (type)
     {
     case NAT_CHAR: return MPI_CHAR;
+    case NAT_UCHAR: return MPI_BYTE;
+    case NAT_SHORT: return MPI_SHORT;
+    case NAT_USHORT: return MPI_UNSIGNED_SHORT;
     case NAT_INT: return MPI_INT;
     case NAT_UINT: return MPI_UNSIGNED;
     case NAT_LONG: return MPI_LONG;
@@ -95,7 +98,7 @@ void MPI_Manager::gatherv_helper1_m (int nval_loc, arr<int> &nval,
   gather_m (nval_loc, nval);
   nval_tot=0;
   for (tsize i=0; i<nval.size(); ++i)
-    nval_tot+=Int(Ts(nval_tot)+Ts(nval[i]));
+    nval_tot=Int(Ts(nval_tot)+Ts(nval[i]));
   offset.alloc(num_ranks_);
   offset[0]=0;
   for (tsize i=1; i<offset.size(); ++i)
@@ -189,7 +192,7 @@ void MPI_Manager::recvRawVoid (void *data, NDT type, tsize num, tsize src) const
 void MPI_Manager::sendrecvRawVoid (const void *sendbuf, tsize sendcnt,
   tsize dest, void *recvbuf, tsize recvcnt, tsize src, NDT type) const
   {
-  assert_unequal(sendbuf,recvbuf);
+  if ((sendcnt>0)&&(recvcnt>0)) assert_unequal(sendbuf,recvbuf);
 
   MPI_Datatype dtype = ndt2mpi(type);
   MPI_Sendrecv (const_cast<void *>(sendbuf),sendcnt,dtype,dest,0,
@@ -205,14 +208,14 @@ void MPI_Manager::sendrecv_replaceRawVoid (void *data, NDT type, tsize num,
 void MPI_Manager::gatherRawVoid (const void *in, tsize num, void *out, NDT type,
   int root) const
   {
-  assert_unequal(in,out);
+  if ((num>0)&&(rank_==root)) assert_unequal(in,out);
   MPI_Datatype dtype = ndt2mpi(type);
   MPI_Gather(const_cast<void *>(in),1,dtype,out,num,dtype,root,LS_COMM);
   }
 void MPI_Manager::gathervRawVoid (const void *in, tsize num, void *out,
   const int *nval, const int *offset, NDT type) const
   {
-  assert_unequal(in,out);
+  if ((num>0)&&(rank_==0)) assert_unequal(in,out);
   MPI_Datatype dtype = ndt2mpi(type);
   MPI_Gatherv(const_cast<void *>(in),num,dtype,out,const_cast<int *>(nval),
     const_cast<int *>(offset),dtype,0,LS_COMM);
@@ -221,9 +224,18 @@ void MPI_Manager::gathervRawVoid (const void *in, tsize num, void *out,
 void MPI_Manager::allgatherRawVoid (const void *in, void *out, NDT type,
   tsize num) const
   {
-  assert_unequal(in,out);
+  if (num>0) assert_unequal(in,out);
   MPI_Datatype tp = ndt2mpi(type);
   MPI_Allgather (const_cast<void *>(in),num,tp,out,num,tp,LS_COMM);
+  }
+void MPI_Manager::allgathervRawVoid (const void *in, int numin, void *out,
+  const int *numout, const int *disout, NDT type) const
+  {
+  if (numin>0) assert_unequal(in,out);
+  planck_assert(numin==numout[rank_],"inconsistent arguments");
+  MPI_Datatype tp = ndt2mpi(type);
+  MPI_Allgatherv (const_cast<void *>(in),numin,tp,out,const_cast<int *>(numout),
+    const_cast<int *>(disout),tp,LS_COMM);
   }
 void MPI_Manager::allreduceRawVoid (void *data, NDT type,
   tsize num, redOp op) const
@@ -231,14 +243,14 @@ void MPI_Manager::allreduceRawVoid (void *data, NDT type,
 void MPI_Manager::allreduceRawVoid (const void *in, void *out, NDT type,
   tsize num, redOp op) const
   {
-  assert_unequal(in,out);
+  if (num>0) assert_unequal(in,out);
   MPI_Allreduce (const_cast<void *>(in),out,num,ndt2mpi(type),op2mop(op),
-    MPI_COMM_WORLD);
+    LS_COMM);
   }
 void MPI_Manager::reduceRawVoid (const void *in, void *out, NDT type, tsize num,
   redOp op, int root) const
   {
-  assert_unequal(in,out);
+  if ((num>0)&&(rank_==root)) assert_unequal(in,out);
   MPI_Reduce (const_cast<void *>(in),out,num,ndt2mpi(type),op2mop(op), root,
     LS_COMM);
   }
@@ -249,7 +261,7 @@ void MPI_Manager::bcastRawVoid (void *data, NDT type, tsize num, int root) const
 void MPI_Manager::all2allRawVoid (const void *in, void *out, NDT type,
   tsize num) const
   {
-  assert_unequal(in,out);
+  if (num>0) assert_unequal(in,out);
   planck_assert (num%num_ranks_==0,
     "array size is not divisible by number of ranks");
   MPI_Datatype tp = ndt2mpi(type);
@@ -261,7 +273,9 @@ void MPI_Manager::all2allvRawVoid (const void *in, const int *numin,
   const int *disin, void *out, const int *numout, const int *disout, NDT type)
   const
   {
-  assert_unequal(in,out);
+  long commsz=disin[num_ranks_-1]+numin[num_ranks_-1]
+             +disout[num_ranks_-1]+numout[num_ranks_-1];
+  if (commsz>0) assert_unequal(in,out);
   MPI_Datatype tp = ndt2mpi(type);
   MPI_Alltoallv (const_cast<void *>(in), const_cast<int *>(numin),
     const_cast<int *>(disin), tp, out, const_cast<int *>(numout),
@@ -272,7 +286,9 @@ void MPI_Manager::all2allvRawVoidBlob (const void *in, const int *numin,
   const int *disin, void *out, const int *numout, const int *disout, int sz)
   const
   {
-  assert_unequal(in,out);
+  long commsz=disin[num_ranks_-1]+numin[num_ranks_-1]
+             +disout[num_ranks_-1]+numout[num_ranks_-1];
+  if (commsz>0) assert_unequal(in,out);
   MPI_Datatype tp;
   MPI_Type_contiguous (sz,MPI_CHAR,&tp);
   MPI_Type_commit(&tp);
@@ -291,9 +307,9 @@ void MPI_Manager::recvRawVoid (void *, NDT, tsize, tsize) const
 void MPI_Manager::sendrecvRawVoid (const void *sendbuf, tsize sendcnt,
   tsize dest, void *recvbuf, tsize recvcnt, tsize src, NDT type) const
   {
-  assert_unequal(sendbuf,recvbuf);
   planck_assert ((dest==0) && (src==0), "inconsistent call");
   planck_assert (sendcnt==recvcnt, "inconsistent call");
+  if (sendcnt>0) assert_unequal(sendbuf,recvbuf);
   memcpy (recvbuf, sendbuf, sendcnt*ndt2size(type));
   }
 void MPI_Manager::sendrecv_replaceRawVoid (void *, NDT, tsize, tsize dest,
@@ -304,19 +320,27 @@ void MPI_Manager::gatherRawVoid (const void *in, tsize num, void *out, NDT type,
   int root) const
   {
   planck_assert(root==0, "invalid root task");
-  assert_unequal(in,out);
+  if (num>0) assert_unequal(in,out);
   memcpy (out, in, num*ndt2size(type));
   }
 void MPI_Manager::gathervRawVoid (const void *in, tsize num, void *out,
   const int *, const int *, NDT type) const
-  { assert_unequal(in,out); memcpy (out, in, num*ndt2size(type)); }
+  { if (num>0) assert_unequal(in,out); memcpy (out, in, num*ndt2size(type)); }
 void MPI_Manager::allgatherRawVoid (const void *in, void *out, NDT type,
   tsize num) const
-  { assert_unequal(in,out); memcpy (out, in, num*ndt2size(type)); }
+  { if (num>0) assert_unequal(in,out); memcpy (out, in, num*ndt2size(type)); }
+void MPI_Manager::allgathervRawVoid (const void *in, int numin, void *out,
+  const int *numout, const int *disout, NDT type) const
+  {
+  if (numin>0) assert_unequal(in,out);
+  planck_assert(numin==numout[0],"inconsistent call");
+  memcpy (reinterpret_cast<char *>(out)+disout[0]*ndt2size(type), in,
+    numin*ndt2size(type));
+  }
 
 void MPI_Manager::allreduceRawVoid (const void *in, void *out, NDT type,
   tsize num, redOp) const
-  { assert_unequal(in,out); memcpy (out, in, num*ndt2size(type)); }
+  { if (num>0) assert_unequal(in,out); memcpy (out, in, num*ndt2size(type)); }
 void MPI_Manager::allreduceRawVoid (void *, NDT, tsize, redOp) const
   {}
 void MPI_Manager::reduceRawVoid (const void *in, void *out, NDT type, tsize num,
@@ -328,13 +352,13 @@ void MPI_Manager::bcastRawVoid (void *, NDT, tsize, int) const
 
 void MPI_Manager::all2allRawVoid (const void *in, void *out, NDT type,
   tsize num) const
-  { assert_unequal(in,out); memcpy (out, in, num*ndt2size(type)); }
+  { if (num>0) assert_unequal(in,out); memcpy (out, in, num*ndt2size(type)); }
 
 void MPI_Manager::all2allvRawVoid (const void *in, const int *numin,
   const int *disin, void *out, const int *numout, const int *disout, NDT type)
   const
   {
-  assert_unequal(in,out);
+  if (numin[0]>0) assert_unequal(in,out);
   planck_assert (numin[0]==numout[0],"message size mismatch");
   const char *in2 = static_cast<const char *>(in);
   char *out2 = static_cast<char *>(out);
@@ -345,7 +369,7 @@ void MPI_Manager::all2allvRawVoidBlob (const void *in, const int *numin,
   const int *disin, void *out, const int *numout, const int *disout, int sz)
   const
   {
-  assert_unequal(in,out);
+  if (numin[0]>0) assert_unequal(in,out);
   planck_assert (numin[0]==numout[0],"message size mismatch");
   const char *in2 = static_cast<const char *>(in);
   char *out2 = static_cast<char *>(out);

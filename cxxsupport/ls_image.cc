@@ -25,7 +25,7 @@
 /*
  *  Classes for creation and output of image files
  *
- *  Copyright (C) 2003-2012 Max-Planck-Society
+ *  Copyright (C) 2003-2015 Max-Planck-Society
  *  Author: Martin Reinecke
  */
 
@@ -44,7 +44,7 @@ const MP_Font giant_font = { 0, 128, 9, 15, giant_font_data };
 
 void Palette::setPredefined (int num)
   {
-  fv.clear(); cv.clear();
+  clear();
   switch(num)
     {
     case 0:
@@ -64,6 +64,38 @@ void Palette::setPredefined (int num)
       add(0.7f,Colour(1,1,0));
       add(0.9f,Colour(1,.33f,0));
       add(1,Colour(.5f,0,0));
+      break;
+    case 10: // Planck colours 1
+      addb(  0,  0,  0,255);
+      addb( 42,  0,112,255);
+      addb( 85,  0,221,255);
+      addb(127,255,237,217);
+      addb(170,255,180,  0);
+      addb(212,255, 75,  0);
+      addb(255,100,  0,  0);
+      break;
+    case 11: // Planck colours 2
+      addb(  0,  0,  0,255);
+      addb( 13, 10, 20,255);
+      addb( 26, 30,184,255);
+      addb( 38, 80,235,255);
+      addb( 52,191,239,250);
+      addb( 65,228,240,245);
+      addb( 76,241,241,212);
+      addb( 77,241,241,212);
+      addb( 88,245,240,175);
+      addb(101,248,235,130);
+      addb(114,250,204, 38);
+      addb(127,243,153, 13);
+      addb(140,204, 77,  0);
+      addb(153,165, 32, 32);
+      addb(166,114,  0, 32);
+      addb(179,128,128,153);
+      addb(192,179,179,204);
+      addb(205,204,204,230);
+      addb(218,230,230,242);
+      addb(231,242,242,250);
+      addb(255,252,252,255);
       break;
     default:
       planck_fail("Palette #"+dataToString(num)+" not yet supported.");
@@ -122,37 +154,49 @@ void LS_Image::write_TGA (const string &file) const
     uint8(xres%256), uint8(xres/256), uint8(yres%256), uint8(yres/256), 24, 32};
 
   bo.put (header, 18);
-
+  vector <uint8> line(3*xres);
   for (tsize j=0; j<yres; ++j)
+    {
     for (tsize i=0; i<xres; ++i)
-      bo << pixel[i][j].b << pixel[i][j].g << pixel[i][j].r;
-
+      {
+      line[i*3  ]=pixel[i][j].b;
+      line[i*3+1]=pixel[i][j].g;
+      line[i*3+2]=pixel[i][j].r;
+      }
+    bo.put(line.data(),3*xres);
+    }
   planck_assert(out,"error writing output file '" + file + "'");
   }
 
 namespace {
 
 void write_equal_range (const arr<Colour8> &px, tsize begin, tsize end,
-  bostream &file)
+  vector<uint8> &buf)
   {
   chunkMaker cm (end-begin,128);
   uint64 cbeg, csz;
   while (cm.getNext(cbeg,csz))
     {
-    file << uint8(csz-1+128);
-    file << px[begin].b << px[begin].g << px[begin].r;
+    buf.push_back(uint8(csz-1+128));
+    buf.push_back(px[begin].b);
+    buf.push_back(px[begin].g);
+    buf.push_back(px[begin].r);
     }
   }
 void write_unequal_range (const arr<Colour8> &px, tsize begin, tsize end,
-  bostream &file)
+  vector<uint8> &buf)
   {
   chunkMaker cm (end-begin,128);
   uint64 cbeg, csz;
   while (cm.getNext(cbeg,csz))
     {
-    file << uint8(csz-1);
+    buf.push_back(uint8(csz-1));
     for (tsize cnt=begin+cbeg; cnt< begin+cbeg+csz; ++cnt)
-      file << px[cnt].b << px[cnt].g << px[cnt].r;
+      {
+      buf.push_back(px[cnt].b);
+      buf.push_back(px[cnt].g);
+      buf.push_back(px[cnt].r);
+      }
     }
   }
 
@@ -170,16 +214,19 @@ void LS_Image::write_TGA_rle(const string &file) const
     uint8(xres%256), uint8(xres/256), uint8(yres%256), uint8(yres/256), 24, 32};
 
   bo.put(header,18);
+  vector<uint8> buf;
+  arr<Colour8> px(xres);
   for (tsize y=0; y<yres; ++y)
     {
-    arr<Colour8> px(xres);
-    for (tsize x=0; x<xres; ++x) px[x] = pixel[x][y];
+    buf.clear();
+    for (tsize x=0; x<xres; ++x)
+      px[x] = pixel[x][y];
     tsize xstart=0;
     while (xstart<xres)
       {
       if (xstart==xres-1)
         {
-        write_unequal_range (px,xstart,xstart+1,bo);
+        write_unequal_range (px,xstart,xstart+1,buf);
         xstart=xres;
         }
       else
@@ -188,18 +235,19 @@ void LS_Image::write_TGA_rle(const string &file) const
           {
           tsize xend=xstart+2;
           while ((xend<xres) && (px[xend]==px[xstart])) ++xend;
-          write_equal_range (px,xstart,xend,bo);
+          write_equal_range (px,xstart,xend,buf);
           xstart=xend;
           }
         else
           {
           tsize xend=xstart+2;
           while ((xend<xres) && (px[xend]!=px[xend-1])) ++xend;
-          write_unequal_range (px,xstart,xend,bo);
+          write_unequal_range (px,xstart,xend,buf);
           xstart=xend;
           }
         }
       }
+    bo.put(buf.data(), buf.size());
     }
   planck_assert(out,"error writing output file '" + file + "'");
   }
@@ -218,9 +266,16 @@ void LS_Image::write_PPM (const string &file) const
   string hdrdata = header.str();
   bo.put(hdrdata.c_str(),hdrdata.size());
 
+  vector <uint8> line(3*xres);
   for (tsize j=0; j<yres; ++j)
+    {
     for (tsize i=0; i<xres; ++i)
-      bo << pixel[i][j].r << pixel[i][j].g << pixel[i][j].b;
-
+      {
+      line[i*3  ]=pixel[i][j].r;
+      line[i*3+1]=pixel[i][j].g;
+      line[i*3+2]=pixel[i][j].b;
+      }
+    bo.put(line.data(),3*xres);
+    }
   planck_assert(out,"error writing output file '" + file + "'");
   }

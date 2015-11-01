@@ -25,7 +25,7 @@
 /*! \file alloc_utils.h
  *  Classes providing raw memory allocation and deallocation support.
  *
- *  Copyright (C) 2011-2013 Max-Planck-Society
+ *  Copyright (C) 2011-2015 Max-Planck-Society
  *  \author Martin Reinecke
  */
 
@@ -38,8 +38,8 @@
 template <typename T> class normalAlloc__
   {
   public:
-    T *alloc(tsize sz) const { return (sz>0) ? new T[sz] : 0; }
-    void dealloc (T *ptr) const { delete[] ptr; }
+    static T *alloc(tsize sz) { return (sz>0) ? new T[sz] : 0; }
+    static void dealloc (T *ptr) { delete[] ptr; }
   };
 
 template <typename T, int align> class alignAlloc__
@@ -48,7 +48,7 @@ template <typename T, int align> class alignAlloc__
     enum { max_nat_align = sizeof(void *) }; // C++11: alignof(std::max_align_t)
 
   public:
-    T *alloc(tsize sz) const
+    static T *alloc(tsize sz)
       {
       using namespace std;
       if (sz==0) return 0;
@@ -72,7 +72,7 @@ template <typename T, int align> class alignAlloc__
         }
       return static_cast<T *>(res);
       }
-    void dealloc(T *ptr) const
+    static void dealloc(T *ptr)
       {
       using namespace std;
       if (align<=max_nat_align)

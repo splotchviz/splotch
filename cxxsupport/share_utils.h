@@ -25,7 +25,7 @@
 /*! \file share_utils.h
  *  Various convenience functions for subdividing tasks into chunks
  *
- *  Copyright (C) 2002-2011 Max-Planck-Society
+ *  Copyright (C) 2002-2014 Max-Planck-Society
  *  \author Martin Reinecke
  */
 
@@ -45,6 +45,14 @@ inline void calcShareGeneral (int64 glo, int64 ghi, int64 nshares,
   int64 additional = nwork%nshares;
   lo = glo+myshare*nbase + ((myshare<additional) ? myshare : additional);
   hi = lo+nbase+(myshare<additional);
+  }
+
+inline int64 shareSize (int64 glo, int64 ghi, int64 nshares, int64 myshare)
+  {
+  int64 nwork = ghi-glo;
+  int64 nbase = nwork/nshares;
+  int64 additional = nwork%nshares;
+  return (myshare<additional) ? nbase+1 : nbase;
   }
 
 /*! Helper class for dividing a range of work items into chunks of specified

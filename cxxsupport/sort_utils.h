@@ -25,7 +25,7 @@
 /*! \file sort_utils.h
  *  Various helper functions for sorting sequences.
  *
- *  Copyright (C) 2002-2011 Max-Planck-Society
+ *  Copyright (C) 2002-2015 Max-Planck-Society
  *  \author Martin Reinecke
  */
 
@@ -80,8 +80,8 @@ template<typename It, typename T2> inline void sortByIndex (It begin, It end,
   typedef typename iterator_traits<It>::value_type T;
   T2 num=end-begin;
   T *tmp= new T[num];
-  for (T2 i=0; i<num; ++i) tmp[i]=*(begin+i);
-  for (T2 i=0; i<num; ++i) *(begin+i) = tmp[idx[i]];
+  for (T2 i=0; i<num; ++i) swap(tmp[i],*(begin+i));
+  for (T2 i=0; i<num; ++i) swap(*(begin+i),tmp[idx[i]]);
   delete[] tmp;
   }
 

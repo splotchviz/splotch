@@ -23,7 +23,7 @@
  */
 
 /*
- *  Copyright (C) 2009-2013 Max-Planck-Society
+ *  Copyright (C) 2009-2014 Max-Planck-Society
  *  \author Martin Reinecke
  */
 
@@ -71,6 +71,9 @@ class MPI_Manager
     int rank() const { return rank_; }
     bool master() const { return rank_==0; }
 
+    int neighbor_up() const { return (rank_+1)%num_ranks_; }
+    int neighbor_down() const { return (rank_+num_ranks_-1)%num_ranks_; }
+
     void barrier() const;
 
     void calcShare (int64 glo, int64 ghi, int64 &lo, int64 &hi) const
@@ -86,6 +89,8 @@ class MPI_Manager
       redOp op, int root=0) const;
     void allgatherRawVoid (const void *in, void *out, NDT type, tsize num)
       const;
+    void allgathervRawVoid (const void *in, int numin, void *out,
+      const int *numout, const int *disout, NDT type) const;
     void allreduceRawVoid (const void *in, void *out, NDT type, tsize num,
       redOp op) const;
     /*! NB: \a num refers to the <i>total</i> number of items in the arrays;
@@ -147,6 +152,15 @@ class MPI_Manager
       sendrecv (buf, dest, buf2, src);
       buf.swap(buf2);
       }
+    template<typename T> void sendrecv_realloc (arr<T> &buf,
+      tsize dest, tsize src) const
+      {
+      tsize sendsize=buf.size(), recvsize;
+      sendrecv (sendsize, dest, recvsize, src);
+      arr<T> buf2(recvsize);
+      sendrecv (buf, dest, buf2, src);
+      buf.swap(buf2);
+      }
 
     template<typename T> void sendrecv_replaceRaw (T *data, tsize num,
       tsize dest, tsize src) const
@@ -160,6 +174,11 @@ class MPI_Manager
     template<typename T> void sendrecv_replace (T &data, tsize dest,
       tsize src) const
       { sendrecv_replaceRaw(&data, 1, dest, src); }
+
+    template<typename T> void rotate_up_realloc (arr<T> &buf) const
+      { sendrecv_realloc(buf,neighbor_up(),neighbor_down()); }
+    template<typename T> void rotate_up_replace (arr<T> &buf) const
+      { sendrecv_replace(buf,neighbor_up(),neighbor_down()); }
 
     template<typename T> void gather_m (const T &in, arr<T> &out, int root=0)
       const
@@ -285,6 +304,16 @@ class MPI_Manager
       {
       out.resize(num_ranks_);
       allgatherRaw (&in, &out[0], 1);
+      }
+
+    template<typename T> void allgathervRaw (const T *in, int numin, T *out,
+      const int *numout, const int *disout) const
+      { allgathervRawVoid (in, numin, out, numout, disout, nativeType<T>()); }
+    template<typename T> void allgatherv (const arr<T> &in, arr<T> &out,
+      const arr<int> &numout, const arr<int> &disout) const
+      {
+      allgathervRaw (in.begin(), in.size(), out.begin(), numout.begin(),
+        disout.begin());
       }
 
     template<typename T> void allreduceRaw (const T *in, T *out, tsize num,

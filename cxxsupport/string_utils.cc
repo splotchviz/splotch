@@ -26,7 +26,7 @@
  *  This file contains the implementation of various convenience functions
  *  used by the Planck LevelS package.
  *
- *  Copyright (C) 2002-2012 Max-Planck-Society
+ *  Copyright (C) 2002-2014 Max-Planck-Society
  *  Author: Martin Reinecke
  */
 
@@ -130,13 +130,12 @@ template<> void stringToData (const string &x, string &value)
 
 template<> void stringToData (const string &x, bool &value)
   {
-  const char *x2 = x.c_str();
-  const char *fval[] = {"F","f","n","N","false",".false.","FALSE",".FALSE." };
-  const char *tval[] = {"T","t","y","Y","true",".true.","TRUE",".TRUE." };
+  const char *fval[] = {"f","n","false",".false."};
+  const char *tval[] = {"t","y","true",".true."};
   for (tsize i=0; i< sizeof(fval)/sizeof(fval[0]); ++i)
-    if (strcmp(x2,fval[i])==0) { value=false; return; }
+    if (equal_nocase(x,fval[i])) { value=false; return; }
   for (tsize i=0; i< sizeof(tval)/sizeof(tval[0]); ++i)
-    if (strcmp(x2,tval[i])==0) { value=true; return; }
+    if (equal_nocase(x,tval[i])) { value=true; return; }
   planck_fail("conversion error in stringToData<bool>(\""+x+"\")");
   }
 
