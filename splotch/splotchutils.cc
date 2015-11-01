@@ -141,5 +141,72 @@ void hostTimeReport(wallTimerSet &Timers)
 bool file_present(const string &name)
   {
   ifstream test(name.c_str());
-  return test;
+  return bool(test);
   }
+
+void checkbbox(std::vector<particle_sim>& p)
+{
+      // this is to check the bounding box
+  float minx=1e15;
+  float maxx=-1e15;
+  float miny=1e15;
+  float maxy=-1e15;
+  float minz=1e15;
+  float maxz=-1e15;
+  for (unsigned long m1=0; m1<p.size(); ++m1)
+  {
+      minx = std::min(minx,p[m1].x);
+      maxx = std::max(maxx,p[m1].x);
+      miny = std::min(miny,p[m1].y);
+      maxy = std::max(maxy,p[m1].y);
+      minz = std::min(minz,p[m1].z);
+      maxz = std::max(maxz,p[m1].z);
+  }
+  if (mpiMgr.master())
+  {
+    std::cout << "minx, maxx: " << minx << " " << maxx << std::endl;
+    std::cout << "miny, maxy: " << miny << " " << maxy << std::endl;
+    std::cout << "minz, maxz: " << minz << " " << maxz << std::endl;
+  }
+}
+
+void checkrth(float r_th, int npart, std::vector<particle_sim>& p, paramfile &/*params*/)
+{
+    // this is to check the .r distribution:
+
+
+  long countsmall=0;
+  long countinter1=0;
+  long countinter2=0;
+  long countinter3=0;
+  long countinter4=0;
+  long countlarge=0;
+  long countactive=0;
+
+  if(r_th != 0.0)
+    {
+    for (long m=0; m<npart; ++m)
+      {
+        if(p[m].active == true)
+        {
+    if(p[m].r < 1.0)countsmall++;
+          if(p[m].r >= 1.0 && p[m].r < r_th)countinter1++;
+          if(p[m].r >= 1.0 && p[m].r < 2*r_th)countinter2++;
+          if(p[m].r >= 1.0 && p[m].r < 4*r_th)countinter3++;
+          if(p[m].r >= 1.0 && p[m].r < 8*r_th)countinter4++;
+          if(p[m].r >= 8*r_th)countlarge++;
+          countactive++;
+        }
+      }
+    if (mpiMgr.master())
+      {
+  std::cout << "NUMBER OF ACTIVE PARTICLES = " << countactive << std::endl;
+  std::cout << "PARTICLES WITH r < 1 = " << countsmall << std::endl;
+  std::cout << "PARTICLES WITH 1 <= r < " << r_th << " = " << countinter1 << std::endl;
+  std::cout << "PARTICLES WITH 1 <= r < " << 2*r_th << " = " << countinter2 << std::endl;
+  std::cout << "PARTICLES WITH 1 <= r < " << 4*r_th << " = " << countinter3 << std::endl;
+  std::cout << "PARTICLES WITH 1 <= r < " << 8*r_th << " = " << countinter4 << std::endl;
+  std::cout << "PARTICLES WITH r >= " << 8*r_th << " = " << countlarge << std::endl;
+      }
+    }
+}

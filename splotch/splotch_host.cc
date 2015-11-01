@@ -32,6 +32,7 @@
 #include "cxxsupport/sse_utils_cxx.h"
 #include "cxxsupport/string_utils.h"
 #include "cxxsupport/openmp_support.h"
+#include "splotch/new_renderer.h"
 
 #define SPLOTCH_CLASSIC
 
@@ -39,23 +40,18 @@ using namespace std;
 
 namespace host_funct {
 
-const float32 h2sigma = 0.5*pow(pi,-1./6.);
-const float32 sqrtpi = sqrt(pi);
+const float32 h2sigma = 0.5*pow(pi,-1./6.); // 0.413
+const float32 sqrtpi = sqrt(pi); // 1.77245
 
 #ifdef SPLOTCH_CLASSIC
-const float32 powtmp = pow(pi,1./3.);
-const float32 sigma0 = powtmp/sqrt(2*pi);
-const float32 bfak=1./(2*sqrt(pi)*powtmp);
-#endif
-
-#ifdef SPLOTCH_CLASSIC
-const float32 rfac=1.5*h2sigma/(sqrt(2.)*sigma0);
+const float32 bfak=0.5*pow(pi,-5./6.); // 0.19261
+const float32 rfac=0.75;
 #else
 const float32 rfac=1.;
 #endif
 
 void particle_project(paramfile &params, vector<particle_sim> &p,
-  const vec3 &campos, const vec3 &lookat, vec3 sky)
+  const vec3 &campos, const vec3 &lookat, vec3 sky, const vec3 &centerpos)
   {
   int xres = params.find<int>("xres",800),
       yres = params.find<int>("yres",xres);
@@ -70,7 +66,7 @@ void particle_project(paramfile &params, vector<particle_sim> &p,
   int npart=p.size();
 
   sky.Normalize();
-  vec3 zaxis = (lookat-campos).Norm();
+  vec3 zaxis = (centerpos-lookat).Norm(); // camera now looks toward negative z
   vec3 xaxis = crossprod (sky,zaxis).Norm();
   vec3 yaxis = crossprod (zaxis,xaxis);
   TRANSFORM trans;
@@ -84,82 +80,85 @@ void particle_project(paramfile &params, vector<particle_sim> &p,
   trans2.Make_Translation_Transform(-campos);
   trans2.Add_Transform(trans);
   trans=trans2;
-
+  vec3 tcpos=trans.TransPoint(centerpos);
   bool projection = params.find<bool>("projection",true);
 
-  float32 dist = (campos-lookat).Length();
-  float32 xfac = 1./(fovfct*dist);
+  float32 dist = (centerpos-lookat).Length();
+  float32 xfac = res2/(fovfct*dist);
+  double xshift=-xfac*tcpos.x,
+         yshift=-xfac*tcpos.y;
+
   if (!projection)
-    cout << " Horizontal field of fiew: " << 1./xfac*2. << endl;
+    cout << " Horizontal field of fiew: " << xres/xfac << endl;
 
   float32 minrad_pix = params.find<float32>("minrad_pix",1.);
 
-#pragma omp parallel
-{
-  float32 xfac2=xfac;
-  long m;
-#pragma omp for schedule(guided,1000)
-  for (m=0; m<npart; ++m)
-    {
-    vec3 v(p[m].x,p[m].y,p[m].z);
-    v=trans.TransPoint(v);
-    p[m].x=v.x; p[m].y=v.y; p[m].z=v.z;
-
-    p[m].active = false;
-    if (p[m].z<=zminval) continue;
-    if (p[m].z>=zmaxval) continue;
-
-    if (!projection)
+  #pragma omp parallel
+  {
+    float32 xfac2=xfac;
+    long m;
+  #pragma omp for schedule(guided,1000)
+    for (m=0; m<npart; ++m)
       {
-      p[m].x = res2*(p[m].x+fovfct*dist)*xfac2;
-      p[m].y = res2*(p[m].y+fovfct*dist)*xfac2 + ycorr;
-      }
-    else
-      {
-      xfac2=1.f/(fovfct*p[m].z);
-      p[m].x = res2*(p[m].x+fovfct*p[m].z)*xfac2;
-      p[m].y = res2*(p[m].y+fovfct*p[m].z)*xfac2 + ycorr;
-      }
+      vec3 v(p[m].x,p[m].y,p[m].z);
+      v=trans.TransPoint(v);
+      p[m].x=v.x; p[m].y=v.y; p[m].z=v.z;
 
-#ifdef SPLOTCH_CLASSIC
-    p[m].I *= 0.5f*bfak/p[m].r;
-    p[m].r*=sqrt(2.f)*sigma0/h2sigma; //  *= 2 ;)
-#else
-    p[m].I *= 8.f/(pi*p[m].r*p[m].r*p[m].r); // SPH kernel normalisation
-    p[m].I *= (h2sigma*sqrtpi*p[m].r); // integral through the center
-#endif
-    p[m].r *= res2*xfac2;
+      p[m].active = false;
+      if (-p[m].z<=zminval) continue;
+      if (-p[m].z>=zmaxval) continue;
 
-    float32 rcorr = sqrt(p[m].r*p[m].r + minrad_pix*minrad_pix)/p[m].r;
-    p[m].r*=rcorr;
-#ifdef SPLOTCH_CLASSIC
-    p[m].I/=rcorr;
-#else
-    p[m].I/=rcorr*rcorr;
-#endif
+      if (!projection)
+        {
+        p[m].x = res2         + p[m].x*xfac2;
+        p[m].y = res2 + ycorr + p[m].y*xfac2;
+        }
+      else
+        {
+        xfac2=-res2/(fovfct*p[m].z);
+        p[m].x = res2 + xshift         + p[m].x*xfac2;
+        p[m].y = res2 + yshift + ycorr + p[m].y*xfac2;
+        }
 
-    float32 posx=p[m].x, posy=p[m].y;
-    float32 rfacr=rfac*p[m].r;
+  #ifdef SPLOTCH_CLASSIC
+      p[m].I *= 0.5f*bfak/p[m].r;
+      p[m].r *= 2;
+  #else
+      p[m].I *= 8.f/(pi*p[m].r*p[m].r*p[m].r); // SPH kernel normalisation
+      p[m].I *= (h2sigma*sqrtpi*p[m].r); // integral through the center
+  #endif
+      p[m].r *= xfac2;
 
-    int minx=int(posx-rfacr+1);
-    if (minx>=xres) continue;
-    minx=max(minx,0);
-    int maxx=int(posx+rfacr+1);
-    if (maxx<=0) continue;
-    maxx=min(maxx,xres);
-    if (minx>=maxx) continue;
-    int miny=int(posy-rfacr+1);
-    if (miny>=yres) continue;
-    miny=max(miny,0);
-    int maxy=int(posy+rfacr+1);
-    if (maxy<=0) continue;
-    maxy=min(maxy,yres);
-    if (miny>=maxy) continue;
+      float32 rcorr = sqrt(p[m].r*p[m].r + minrad_pix*minrad_pix)/p[m].r;
+      p[m].r*=rcorr;
+  #ifdef SPLOTCH_CLASSIC
+      p[m].I/=rcorr;
+  #else
+      p[m].I/=rcorr*rcorr;
+  #endif
 
-    p[m].active = true;
+      float32 posx=p[m].x, posy=p[m].y;
+      float32 rfacr=rfac*p[m].r;
+
+      int minx=int(posx-rfacr+1);
+      if (minx>=xres) continue;
+      minx=max(minx,0);
+      int maxx=int(posx+rfacr+1);
+      if (maxx<=0) continue;
+      maxx=min(maxx,xres);
+      if (minx>=maxx) continue;
+      int miny=int(posy-rfacr+1);
+      if (miny>=yres) continue;
+      miny=max(miny,0);
+      int maxy=int(posy+rfacr+1);
+      if (maxy<=0) continue;
+      maxy=min(maxy,yres);
+      if (miny>=maxy) continue;
+
+      p[m].active = true;
     }
-}
   }
+}
 
 void particle_colorize(paramfile &params, vector<particle_sim> &p,
   vector<COLOURMAP> &amap, float b_brightness)
@@ -435,27 +434,40 @@ void render_new (particle_sim *p, int npart, arr2<COLOUR> &pic,
 
   tstack_pop("Host Rendering proper");
   }
-}
+
+} // namespace host_funct
 
 using namespace host_funct;
 
 void host_rendering (paramfile &params, vector<particle_sim> &particles,
-  arr2<COLOUR> &pic, const vec3 &campos, const vec3 &lookat, const vec3 &sky,
+  arr2<COLOUR> &pic, const vec3 &campos, const vec3 &centerpos,
+  const vec3 &lookat, const vec3 &sky,
   vector<COLOURMAP> &amap, float b_brightness, tsize npart_all)
   {
-    bool master = mpiMgr.master();
-    tsize npart = particles.size();
+//  if (params.find<bool>("new_renderer", false))
+//    {
+//    host_rendering_new(params, particles, pic, campos, centerpos, lookat, sky,
+//      amap, b_brightness, npart_all);
+//    return;
+//    }
+
+  bool master = mpiMgr.master();
+  tsize npart = particles.size();
   //tsize npart_all = npart;
   //mpiMgr.allreduce (npart_all,MPI_Manager::Sum);
 
+  bool bbox = params.find<bool>("bbox",false);
+  if(bbox)
+    checkbbox(particles);
 // -------------------------------------
 // ----------- Transforming ------------
 // -------------------------------------
   tstack_push("3D transform");
   if (master)
     cout << endl << "host: applying geometry (" << npart_all << ") ..." << endl;
-  particle_project(params, particles, campos, lookat, sky);
+  particle_project(params, particles, campos, lookat, sky, centerpos);
   tstack_replace("3D transform","Particle coloring");
+
 
 // ------------------------------------
 // ----------- Coloring ---------------
@@ -464,6 +476,19 @@ void host_rendering (paramfile &params, vector<particle_sim> &particles,
     cout << endl << "host: calculating colors (" << npart_all << ") ..." << endl;
   particle_colorize(params, particles, amap, b_brightness);
   tstack_pop("Particle coloring");
+
+// ------------------------------------
+// ----------- Distribution -----------
+// ------------------------------------
+
+  // Check the r threshold distribution if user requests
+  float r_th = params.find<float>("rth",0.0);
+  if(r_th != 0.0)
+  {
+    tstack_push("rth distribution");
+    checkrth(r_th, npart, particles, params);
+    tstack_pop("rth distribution");
+  }
 
 #if 0
 // ------------------------------------
@@ -517,3 +542,4 @@ void host_rendering (paramfile &params, vector<particle_sim> &particles,
   render_new (&(particles[0]),particles.size(),pic,a_eq_e,grayabsorb);
   tstack_pop("Rendering");
   }
+

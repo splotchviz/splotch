@@ -30,9 +30,6 @@
 #include "cxxsupport/datatypes.h"
 #include "reader/reader.h"
 #include "booster/mesh_vis.h"
-#ifndef NEW_MPISTUFF
-#include <limits>
-#endif
 
 using namespace std;
 
@@ -42,7 +39,7 @@ void sceneMaker::particle_normalize(vector<particle_sim> &p, bool verbose)
   // how many particle types are there
   int nt = params.find<int>("ptypes",1);
   arr<bool> col_vector(nt),log_int(nt),log_col(nt),asinh_col(nt);
-  arr<Normalizer<float32> > intnorm(nt), colnorm(nt);
+  arr<Normalizer<float32> > intnorm(nt), colnorm(nt), sizenorm(nt);
 
   // Get data from parameter file
   for(int t=0; t<nt; t++)
@@ -59,13 +56,16 @@ void sceneMaker::particle_normalize(vector<particle_sim> &p, bool verbose)
 {
   // FIXME: the "+20" serves as protection against false sharing,
   // should be done more elegantly
-  arr<Normalizer<float32> > inorm(nt+20), cnorm(nt+20);
+  arr<Normalizer<float32> > inorm(nt+20), cnorm(nt+20), rnorm(nt+20);
   int m;
 #ifdef CUDA
   // In cuda version logs are performed on device
+  #pragma omp for schedule(guided,1000)
   for (m=0; m<npart; ++m)
     {
     int t=p[m].type;
+
+    rnorm[t].collect(p[m].r);
 
     if (log_int[t])
       {
@@ -131,6 +131,7 @@ void sceneMaker::particle_normalize(vector<particle_sim> &p, bool verbose)
     {
     intnorm[t].collect(inorm[t]);
     colnorm[t].collect(cnorm[t]);
+    sizenorm[t].collect(rnorm[t]);
     }
 }
 
@@ -140,6 +141,8 @@ void sceneMaker::particle_normalize(vector<particle_sim> &p, bool verbose)
   for (m=0; m<npart; ++m) // do log calculations if requested
     {
     int t=p[m].type;
+
+    rnorm[t].collect(p[m].r);
 
     if (log_int[t])
       {
@@ -192,6 +195,7 @@ void sceneMaker::particle_normalize(vector<particle_sim> &p, bool verbose)
     {
     intnorm[t].collect(inorm[t]);
     colnorm[t].collect(cnorm[t]);
+    sizenorm[t].collect(rnorm[t]);
     }
   }
 #endif
@@ -199,8 +203,10 @@ void sceneMaker::particle_normalize(vector<particle_sim> &p, bool verbose)
     {
     mpiMgr.allreduce(intnorm[t].minv,MPI_Manager::Min);
     mpiMgr.allreduce(colnorm[t].minv,MPI_Manager::Min);
+    mpiMgr.allreduce(sizenorm[t].minv,MPI_Manager::Min);
     mpiMgr.allreduce(intnorm[t].maxv,MPI_Manager::Max);
     mpiMgr.allreduce(colnorm[t].maxv,MPI_Manager::Max);
+    mpiMgr.allreduce(sizenorm[t].maxv,MPI_Manager::Max);
 
     if (verbose && mpiMgr.master())
       {
@@ -210,6 +216,8 @@ void sceneMaker::particle_normalize(vector<particle_sim> &p, bool verbose)
            colnorm[t].maxv << " (max) " << endl;
       cout << " Intensity Range: " << intnorm[t].minv << " (min) , " <<
            intnorm[t].maxv << " (max) " << endl;
+      cout << " Size Range: " << sizenorm[t].minv << " (min) , " <<
+	   sizenorm[t].maxv << " (max) " << endl;
       }
 
     if(params.param_present("intensity_min"+dataToString(t)))
@@ -321,27 +329,40 @@ void sceneMaker::particle_interpolate(vector<particle_sim> &p,double frac) const
     double dt = (t2 - t1) * h;
     v_unit1=v_unit/l_unit/sqrt(time1)*dt;
     v_unit2=v_unit/l_unit/sqrt(time2)*dt;
+    //    cout << "Times: " << time1 << " " << time2 << " " << t1 << " " << t2 << " " << v_unit1 << " " << v_unit2 << endl;
     }
 
   vector<pair<MyIDType,MyIDType> > v;
   v.reserve(min(p1.size(),p2.size()));
     {
     MyIDType i1=0,i2=0;
-    while(i1<p1.size() && i2<p2.size())
+    while(i1<p1.size() || i2<p2.size())
       {
-      if (id1[idx1[i1]]==id2[idx2[i2]])
-        //  if(p1[idx1[i1]].type==p2[idx2[i2]].type)
+      if (i1>=p1.size()) // reached the end of list 1, new particle appears
+        {
+        v.push_back(pair<MyIDType,MyIDType>(MyMaxID,idx2[i2]));
+        i2++;
+        }
+      else if (i2>=p2.size()) // reached the end of list 2, particle disappears
+        {
+        v.push_back(pair<MyIDType,MyIDType>(idx1[i1],MyMaxID));
+        i1++;
+        }
+      else // still particles in both lists
+        {
+        if (id1[idx1[i1]]==id2[idx2[i2]]) // particle evolves
         v.push_back(pair<MyIDType,MyIDType>(idx1[i1++],idx2[i2++]));
-      else if (id1[idx1[i1]]<id2[idx2[i2]])
-	{
-	  v.push_back(pair<MyIDType,MyIDType>(idx1[i1],MyMaxID));
-	  i1++;
-	}
-      else if (id1[idx1[i1]]>id2[idx2[i2]])
-	{
-	  v.push_back(pair<MyIDType,MyIDType>(MyMaxID,idx2[i2]));
-	  i2++;
-	}
+        else if (id1[idx1[i1]]<id2[idx2[i2]]) // particle disappears
+          {
+          v.push_back(pair<MyIDType,MyIDType>(idx1[i1],MyMaxID));
+          i1++;
+          }
+        else if (id1[idx1[i1]]>id2[idx2[i2]]) // new particle appears
+          {
+          v.push_back(pair<MyIDType,MyIDType>(MyMaxID,idx2[i2]));
+          i2++;
+          }
+        }
       }
     }
 
@@ -379,48 +400,160 @@ void sceneMaker::particle_interpolate(vector<particle_sim> &p,double frac) const
     vec3f pos;
     if (interpol_mode>1)
       {
-	vec3f v1,v2;
-        if (i1 < MyMaxID && i2 < MyMaxID) 
-	  {
-	    v1 = vel1[i1]; 
-	    v2 = vel2[i2];
-	  }
-	if (i1 == MyMaxID)
-	  {
-	    v1 = v2 = vel2[i2];
-	    x1 = x2 - v1 / (0.5 * (v_unit1 + v_unit2));
-	  }
-	if (i2 == MyMaxID)
-	  {
-	    v1 = v2 = vel1[i1];
-	    x2 = x1 + v1 / (0.5 * (v_unit1 + v_unit2));
-	  }
-	vec3f vda = (x2-x1)*2. - (v1*v_unit1 + v2*v_unit2);
-	pos = x1 + v1*(v_unit1*frac)
-          + (v2*v_unit2 - v1*v_unit1 + vda)*(frac*frac*0.5);
+      vec3f v1(0,0,0),v2(0,0,0);
+      if (i1 < MyMaxID && i2 < MyMaxID)
+        {
+        v1 = vel1[i1];
+        v2 = vel2[i2];
+        }
+      if (i1 == MyMaxID)
+        {
+        v1 = v2 = vel2[i2];
+        x1 = x2 - v1 / (0.5 * (v_unit1 + v_unit2));
+        }
+      if (i2 == MyMaxID)
+        {
+        v1 = v2 = vel1[i1];
+        x2 = x1 + v1 / (0.5 * (v_unit1 + v_unit2));
+        }
+      if (interpol_mode == 2)           // polynomial interpolation
+        {
+        pos = x1 + (x2-x1)*3*frac*frac
+                 - (x2-x1)*2*frac*frac*frac
+                 + v1*v_unit1*frac
+                 - (v1*2*v_unit1+v2*v_unit2)*frac*frac
+                 + (v1*v_unit1+v2*v_unit2)*frac*frac*frac;
+        }
+      else                              // orbital interpolation
+        {
+        double mypos[3];
+        for(int k=0;k<3;k++)
+          {
+          double myx1=0,myx2=0,myv1=0,myv2=0;
+          if (k==0)
+            {
+            myx1=x1.x;
+            myx2=x2.x;
+            myv1=v1.x;
+            myv2=v2.x;
+            }
+          if (k==1)
+            {
+            myx1=x1.y;
+            myx2=x2.y;
+            myv1=v1.y;
+            myv2=v2.y;
+            }
+          if (k==2)
+            {
+            myx1=x1.z;
+            myx2=x2.z;
+            myv1=v1.z;
+            myv2=v2.z;
+            }
+
+          // Interpolation on a eliptic orbit : x = a0 + a1*cos(a3*dt) + a2*sin(a3*dt)
+          // we need to find the zero point of f(a) = (dv/dx)*(1-cos(a)) = a*sin(a)
+          // or equivalent the solution of a/tan(0.5*a) = dv/dx
+          double dvdx = (myv1*v_unit1+myv2*v_unit2) / (myx2-myx1);
+          if(dvdx > 1.99)
+            dvdx = 1.99;
+          // produce a scaled version of a/tan(0.5*a) which can be simple inverted
+          // (function is almost symmetric to the diagonal in the coordinate system)
+          double xx=6.25;
+          double yy=abs(xx/tan(0.5*xx));
+          double dvdx_scale=(dvdx+yy)/(yy+2)*xx;
+          double a_guess,a_found;
+          double correction;
+
+          if(dvdx >= 2)
+            {
+            a_guess = 12.5 / dvdx;
+            double myp0 = 0.28596449, myp1 = -2.3100819;
+            correction = pow(myp0 * dvdx , myp1);
+            a_found = a_guess - correction + 2 * M_PI;
+            }
+          else
+            {
+            if(dvdx_scale >= xx)
+              {
+              a_guess = a_found = 1e-8;
+              correction = 0;
+              }
+            else
+              {
+              a_guess = (dvdx_scale/tan(0.5*dvdx_scale)+yy)/(yy+2)*xx;
+              // we have a complicated polynomial fit to do a fist correction to the result
+              double myp0 = -0.0063529879 , myp1 = 0.42990545,  myp2 = -0.015337119, myp3 = -0.017165266,
+                     myp4 =  0.16812639   , myp5 = 0.062027583, myp6 =  1.8925764;
+              correction = myp0 * exp(myp5*pow(a_guess,myp6)) * pow(a_guess,myp1) *
+                           (a_guess - 3.2518792) * pow(abs(a_guess - 3.2518792),myp2) *
+                           (a_guess - 5.8155169) * pow(abs(a_guess - 5.8155169),myp3) *
+                           (a_guess - 6.25) * pow(abs(a_guess - 6.25),myp4);
+              a_found = a_guess + correction;
+              }
+            }
+          // Finally do some newton-raphson steps to improve our result
+          long iter=0;
+          while((abs(dvdx - a_found/tan(0.5*a_found)) > 1e-6) && (iter < 10))
+            {
+            double da_found = -1 * (dvdx * (1-cos(a_found)) - a_found * sin(a_found)) /
+                                  ((dvdx-1)*sin(a_found) - a_found * cos(a_found));
+            if(a_found + da_found < 0)
+              a_found = a_found*0.95;
+            else
+              a_found = a_found + da_found;
+            iter++;
+            if(iter > 6)
+              {
+              cout << "Iter: " << iter << " "
+                    << dvdx << " "
+                    << dvdx_scale << " "
+                    << a_guess << " "
+                    << a_guess + correction << " "
+                    << a_found << " "
+                    << dvdx - a_found/tan(0.5*a_found) << endl;
+              }
+            }
+          if(iter >= 10)
+            planck_fail("could not find zero point for interpolation fit !");
+          // Now find the other aprameters
+          double a0,a1,a2=myv1*v_unit1/a_found;
+          if (abs(sin(a_found)) < 1e-6)
+            a1=(myx1-myx2+a2*sin(a_found))/(1-cos(a_found));
+          else
+            a1=(myv1*v_unit1*cos(a_found)-myv2*v_unit2)/(a_found*sin(a_found));
+          a0=myx1-a1;
+          // Now we can finally interpolate the positions
+          mypos[k] = a0 + a1*cos(a_found*frac) + a2*sin(a_found*frac);
+          }
+        pos.x = mypos[0];
+        pos.y = mypos[1];
+        pos.z = mypos[2];
+        }
       }
     else
       pos = x1*(1.-frac) + x2*frac;
 
 
-    if (i1 < MyMaxID && i2 < MyMaxID) 
+    if (i1 < MyMaxID && i2 < MyMaxID)
       p[i]=particle_sim(p1[i1].e*(1.-frac)+p2[i2].e*frac,
-			pos.x,pos.y,pos.z,
-			(1-frac) * p1[i1].r  + frac*p2[i2].r,
-			(1-frac) * p1[i1].I  + frac*p2[i2].I,
-			p1[i1].type,p1[i1].active);
+        pos.x,pos.y,pos.z,
+        (1-frac) * p1[i1].r  + frac*p2[i2].r,
+        (1-frac) * p1[i1].I  + frac*p2[i2].I,
+        p1[i1].type,p1[i1].active);
     if (i1 == MyMaxID)
       p[i]=particle_sim(p2[i2].e,
-			pos.x,pos.y,pos.z,
-			p2[i2].r,
-			frac*p2[i2].I,
-			p2[i2].type,p2[i2].active);
+        pos.x,pos.y,pos.z,
+        p2[i2].r,
+        frac*p2[i2].I,
+        p2[i2].type,p2[i2].active);
     if (i2 == MyMaxID)
       p[i]=particle_sim(p1[i1].e,
-			pos.x,pos.y,pos.z,
-			p1[i1].r,
-			(1-frac)*p1[i1].I,
-			p1[i1].type,p1[i1].active);
+        pos.x,pos.y,pos.z,
+        p1[i1].r,
+        (1-frac)*p1[i1].I,
+        p1[i1].type,p1[i1].active);
     }
 }
 
@@ -460,6 +593,7 @@ sceneMaker::sceneMaker (paramfile &par)
     planck_assert (inp, "could not open scene file '" + geometry_file +"'");
     int current_scene = params.find<int>("scene_start",0);
     int scene_incr = params.find<int>("scene_incr",1);
+    int last_scene = params.find<int>("last_scene",1000000);
 
     string line;
     getline(inp, line);
@@ -486,7 +620,7 @@ sceneMaker::sceneMaker (paramfile &par)
     for (int i=0; i<current_scene; ++i)
       getline(inp, line);
 
-    while (getline(inp, line))
+    while (getline(inp, line) && current_scene < last_scene)
       {
       paramfile scnpar;
       scnpar.setVerbosity(false);
@@ -516,9 +650,13 @@ sceneMaker::sceneMaker (paramfile &par)
       }
     }
 
+  bool do_panorama = params.find<bool>("panorama",false);
+  for (tsize m=0; m<scenes.size(); ++m)
+    do_panorama = do_panorama || scenes[m].sceneParameters.find<bool>("panorama",false);
   bool do_stereo = params.find<double>("EyeSeparation",0)!=0.;
   for (tsize m=0; m<scenes.size(); ++m)
     do_stereo = do_stereo || (scenes[m].sceneParameters.find<double>("EyeSeparation",0)!=0.);
+  planck_assert(!(do_panorama&&do_stereo), "inconsistent parameters");
   if (do_stereo)
     {
     vector<scene> sc_orig;
@@ -548,22 +686,64 @@ sceneMaker::sceneMaker (paramfile &par)
 
       vec3 view = lookat - campos;
 
-      vec3 right = crossprod (sky,view);
+      vec3 right = crossprod (view,sky);
 
       double distance = eye_separation * view.Length();
 
-      vec3 campos_r = campos - right / right.Length() * distance*0.5;
+      spa.setParam("center_x",campos.x);
+      spa.setParam("center_y",campos.y);
+      spa.setParam("center_z",campos.z);
+      spb.setParam("center_x",campos.x);
+      spb.setParam("center_y",campos.y);
+      spb.setParam("center_z",campos.z);
+
+      vec3 campos_r = campos + right / right.Length() * distance*0.5;
       spa.setParam("camera_x",campos_r.x);
       spa.setParam("camera_y",campos_r.y);
       spa.setParam("camera_z",campos_r.z);
 
-      vec3 campos_l = campos + right / right.Length() * distance*0.5;
+      vec3 campos_l = campos - right / right.Length() * distance*0.5;
       spb.setParam("camera_x",campos_l.x);
       spb.setParam("camera_y",campos_l.y);
       spb.setParam("camera_z",campos_l.z);
 
-      sa.outname = "left_"+sa.outname;
-      sb.outname = "right_"+sb.outname;
+      sa.outname = "right_"+sa.outname;
+      sb.outname = "left_"+sb.outname;
+      }
+    }
+  if (do_panorama)
+    {
+    const double camx_ofs[]= { 1, 0,-1, 0, 0, 0 };
+    const double camy_ofs[]= { 0, 1, 0,-1, 0, 0 };
+    const double camz_ofs[]= { 0, 0, 0, 0, 1,-1 };
+    const double sky_x[]= { 0, 0, 0, 0,-1, 1 };
+    const double sky_z[]= { 1, 1, 1, 1, 0, 0 };
+    const char * prefix[] = { "1_", "2_", "3_", "4_", "5_", "6_" };
+    vector<scene> sc_orig;
+    sc_orig.swap(scenes);
+    for (tsize i=0; i<sc_orig.size(); ++i)
+      {
+      for (tsize j=0; j<6; ++j)
+        {
+        scenes.push_back(sc_orig[i]);
+        scene &sc(scenes.back());
+        paramfile &sp(sc.sceneParameters);
+        if (j<5) sc.keep_particles=true;
+        if (j>0) sc.reuse_particles=true;
+
+        sp.setParam("fov",90.);
+        vec3 cam(sp.find<double>("camera_x",params.find<double>("camera_x")),
+                 sp.find<double>("camera_y",params.find<double>("camera_y")),
+                 sp.find<double>("camera_z",params.find<double>("camera_z")));
+
+        sp.setParam("lookat_x",cam.x+camx_ofs[j]);
+        sp.setParam("lookat_y",cam.y+camy_ofs[j]);
+        sp.setParam("lookat_z",cam.z+camz_ofs[j]);
+        sp.setParam("sky_x",sky_x[j]);
+        sp.setParam("sky_y",0.);
+        sp.setParam("sky_z",sky_z[j]);
+        sc.outname = string(prefix[j])+sc.outname;
+        }
       }
     }
   }
@@ -580,8 +760,10 @@ void sceneMaker::fetchFiles(vector<particle_sim> &particle_data, double fidx)
     cout << endl << "reading data ..." << endl;
   int simtype = params.find<int>("simtype");
   int spacing = params.find<double>("snapshot_spacing",1);
-  int snr1 = int(fidx/spacing)*spacing, snr2=snr1+spacing;
-  double frac=(fidx-snr1)/spacing;
+  int snr1_guess = int(fidx/spacing)*spacing, snr2_guess=snr1_guess+spacing;
+  int snr1 = params.find<int>("snapshot_base1",snr1_guess);
+  int snr2 = params.find<int>("snapshot_base2",snr2_guess);
+  double frac=(fidx-snr1)/(snr2-snr1);
 
   tstack_push("Reading");
 
@@ -604,43 +786,11 @@ void sceneMaker::fetchFiles(vector<particle_sim> &particle_data, double fidx)
           {
           if (mpiMgr.master())
             cout << " old2 = new1!" << endl;
-#ifndef NEW_MPISTUFF
-          if ((mpiMgr.num_ranks()>1) // <-- only makes sense with true MPI runs
-              &&
-              params.find<bool>("mpi_interpolation_reread_data",false)) // <-- saves some memory at the expense of re-reading the dataset p1 (formerly p2)
-            {
-            // re-read the data set since no backup copy can be expected to exist in memory
-              if (mpiMgr.master())
-                cout << " re-reading new1 " << snr1 << endl;
-            gadget_reader(params,interpol_mode,p1,id1,vel1,snr1,time1,boxsize);
-            redshift1=-1.0;
-            mpiMgr.barrier();
-            tstack_replace("Reading","Particle index generation");
-            buildIndex(id1.begin(),id1.end(),idx1);
-            tstack_replace("Particle index generation","Reading");
-            }
-          else
-            {
-            // MPI and non-MPI default case
-            tstack_replace("Reading","Fetch remote particles");
-            mpiMgr.barrier();
-            MpiStripRemoteParticles();
-            mpiMgr.barrier();
-            //
-            p1.clear();   p1.swap(p2);
-            id1.clear();  id1.swap(id2);
-            idx1.clear(); idx1.swap(idx2);
-            vel1.clear(); vel1.swap(vel2);
-            tstack_replace("Fetch remote particles","Reading");
-            time1 = time2;
-            }
-#else
           p1.swap(p2);
           id1.swap(id2);
           idx1.swap(idx2);
           vel1.swap(vel2);
           time1 = time2;
-#endif
           snr1_now = snr1;
           }
         if (snr1_now!=snr1)
@@ -723,40 +873,12 @@ void sceneMaker::fetchFiles(vector<particle_sim> &particle_data, double fidx)
         if (snr1==snr2_now)
           {
           cout << " old2 = new1!" << endl;
-#ifdef NEW_MPISTUFF
           p1.swap(p2);
           id1.swap(id2);
           idx1.swap(idx2);
           vel1.swap(vel2);
           time1 = time2;
           redshift1 = redshift2;
-#else
-          if ((mpiMgr.num_ranks()>1) && params.find<bool>("mpi_interpolation_reread_data",false))
-            {
-            // re-read the data set since no backup copy exists in memory
-            cout << " re-reading new1 " << snr1 << endl;
-            gadget_hdf5_reader(params,interpol_mode,p1,id1,vel1,snr1,time1,redshift1,boxsize);
-            mpiMgr.barrier();
-            tstack_replace("Input","Particle index generation");
-            buildIndex(id1.begin(),id1.end(),idx1);
-            tstack_replace("Particle index generation","Input");
-            }
-          else
-            {
-            // MPI and non-MPI default case
-            mpiMgr.barrier();
-            MpiStripRemoteParticles();
-            mpiMgr.barrier();
-            //
-            p1.clear();   p1.swap(p2);
-            id1.clear();  id1.swap(id2);
-            idx1.clear(); idx1.swap(idx2);
-            vel1.clear(); vel1.swap(vel2);
-            //
-            time1 = time2;
-            redshift1 = redshift2;
-            }
-#endif
           snr1_now = snr1;
           }
         if (snr1_now!=snr1)
@@ -804,11 +926,18 @@ void sceneMaker::fetchFiles(vector<particle_sim> &particle_data, double fidx)
       break;
 #ifdef HDF5
     case 12:
-      h5part_reader(params,particle_data);
+      //h5part_reader(params,particle_data);
+      planck_fail("h5part reader currently inactive");
       break;
 #endif
     case 13:
       ramses_reader(params,particle_data);
+      break;
+    case 14:
+      bonsai_reader(params,particle_data);
+      break;
+    case 15:
+      ascii_reader(params,particle_data);
       break;
     }
   mpiMgr.barrier();
@@ -873,7 +1002,7 @@ void sceneMaker::fetchFiles(vector<particle_sim> &particle_data, double fidx)
   }
 
 bool sceneMaker::getNextScene (vector<particle_sim> &particle_data,
-  vector<particle_sim> &r_points, vec3 &campos, vec3 &lookat, vec3 &sky,
+  vector<particle_sim> &r_points, vec3 &campos, vec3 &centerpos, vec3 &lookat, vec3 &sky,
   string &outfile)
   {
   if (tsize(++cur_scene) >= scenes.size()) return false;
@@ -889,6 +1018,10 @@ bool sceneMaker::getNextScene (vector<particle_sim> &particle_data,
   campos=vec3(params.find<double>("camera_x"),params.find<double>("camera_y"),params.find<double>("camera_z"));
   lookat=vec3(params.find<double>("lookat_x"),params.find<double>("lookat_y"),params.find<double>("lookat_z"));
   sky   =vec3(params.find<double>("sky_x",0), params.find<double>("sky_y",0), params.find<double>("sky_z",1));
+  if (params.param_present("center_x"))
+    centerpos=vec3(params.find<double>("center_x"),params.find<double>("center_y"),params.find<double>("center_z"));
+  else
+    centerpos=campos;
 
   outfile=scn.outname;
   double fidx=params.find<double>("fidx",0);
@@ -951,8 +1084,6 @@ bool sceneMaker::getNextScene (vector<particle_sim> &particle_data,
   return true;
   }
 
-#ifdef NEW_MPISTUFF
-
 namespace {
 
 template<typename T> void comm_helper
@@ -998,6 +1129,7 @@ void sceneMaker::MpiFetchRemoteParticles ()
 #endif
 
   vector<vector<MyIDType> > idx_send (ntasks); // what gets sent where
+  vector<bool> sent(idx1.size(),false);
 
   for (int tc=0; tc<ntasks; ++tc) // circular data exchange
     {
@@ -1008,6 +1140,7 @@ void sceneMaker::MpiFetchRemoteParticles ()
       if (id_needed[i2]==id1[idx1[i1]]) // needed and available
         {
         idx_send[t_req].push_back(idx1[i1]);
+        sent[i1]=true;
         i1++; i2++;
         }
       else if (id_needed[i2]<id1[idx1[i1]]) // needed but not available
@@ -1021,6 +1154,10 @@ void sceneMaker::MpiFetchRemoteParticles ()
         (mytask+1)%ntasks,(mytask+ntasks-1)%ntasks);
     }
   releaseMemory(id_needed);
+
+  // keep particles that are not needed anywhere on their original task
+  for (tsize i1=0; i1<idx1.size(); ++i1)
+    if (!sent[i1]) idx_send[mytask].push_back(idx1[i1]);
 
   comm_helper(idx_send,id1);
   comm_helper(idx_send,p1);
@@ -1036,484 +1173,10 @@ void sceneMaker::MpiFetchRemoteParticles ()
 #endif
   }
 
-#else
-
-/**
- * Routines for MPI parallel interpolation below.  Testing and optimization needed.  (Klaus Reuter, RZG)
- */
-
-// MpiFetchRemoteParticles() adds particles from remote processes to p2
-void sceneMaker::MpiFetchRemoteParticles ()
-{
-  if (mpiMgr.num_ranks()==1)
-    return;
-
-  bool debug_msg   = params.find<bool>("mpi_interpolation_debug_msg",false);
-  bool patch_data  = params.find<bool>("mpi_interpolation_patch_data",true);
-  bool reread_data = params.find<bool>("mpi_interpolation_reread_data",false);
-
-  if (debug_msg)
+#ifdef MIC
+  // Check if we are on final scene, if so we must free memory
+  bool sceneMaker::is_final_scene()
   {
-    cout << "MpiFetchRemoteParticles() : BEGIN" << endl << flush;
-    cout << "MpiFetchRemoteParticles() : Determining required particles ..." << endl << flush;
+    return (cur_scene == scenes.size() - 1) ? true : false;
   }
-
-  if (patch_data)
-  {
-    // save the number of particles which are initially in p2
-    // this information is needed in MpiStripRemoteParticles()
-    numberOfLocalParticles=p2.size();
-  }
-  else
-  {
-    // create a backup copy of p2 and the related data structures
-    if (!reread_data)
-    {
-      p2Backup   = p2;
-      id2Backup  = id2;
-      idx2Backup = idx2;
-      vel2Backup = vel2;
-    }
-  }
-
-  // data structures ("q2") which collect data and are used to patch p2 and id2
-  vector<MyIDType>      idQ2;   idQ2.clear();
-  vector<particle_sim>  q2;     q2.clear();
-  vector<vec3f>         velQ2;  velQ2.clear();
-
-  vector<MyIDType> requiredRemoteParticleIds;
-  requiredRemoteParticleIds.clear();
-
-  if (patch_data)
-  {
-    //search for the particles that are *really* needed
-    //
-    tsize i1=0;
-    tsize i2=0;
-    tsize nZeros=0;
-    //
-    while(i1<p1.size() && i2<p2.size())
-    {
-      if (id1[idx1[i1]]==id2[idx2[i2]])
-      {
-        // particle is present in both, p1 and p2
-        if (id1[idx1[i1]]==0)
-          nZeros++;
-        i1++;
-        i2++;
-      }
-      else if (id1[idx1[i1]]<id2[idx2[i2]])
-      {
-        // particle is present in p1 but not in p2
-        if (id1[idx1[i1]]>0)
-          requiredRemoteParticleIds.push_back( id1[idx1[i1]] );
-        i1++;
-      }
-      else if (id1[idx1[i1]]>id2[idx2[i2]])
-      {
-        // particle is present in p2 but not in p1
-        i2++;
-      }
-    }
-    //
-    if (debug_msg)
-      cout << "MpiFetchRemoteParticles() : nZeros : " << nZeros << endl << flush;
-  }
-  else
-  {
-    // "dumb" method: set all required Ids to id1
-    requiredRemoteParticleIds=id1;
-  }
-
-
-  int numberOfRequiredRemoteParticleIds;
-  numberOfRequiredRemoteParticleIds = requiredRemoteParticleIds.size();
-
-  if (debug_msg)
-    cout << "MpiFetchRemoteParticles() : Required particles : " << numberOfRequiredRemoteParticleIds << endl << flush;
-
-
-  //
-  // In each MPI rank, we now have:
-  //  requiredRemoteParticleIds         : list of particle IDs which are not in p2 and needed from other MPI processes
-  //  numberOfRequiredRemoteParticleIds : the number of particles needed from other MPI processes
-  //
-  // We now loop over all ranks, where iRank is the rank
-  // which shall receive required data from all other ranks
-  // the vectors q2 and idQ2 collect the data and the indices
-  //
-  for (int iRank=0; iRank<mpiMgr.num_ranks(); iRank++)
-  {
-
-    if (debug_msg)
-      cout << "MpiFetchRemoteParticles() : Redistributing required particles -- begin, iRank=" << iRank << endl << flush;
-
-    if (iRank==mpiMgr.rank())
-    {
-      idQ2.clear();
-      q2.clear();
-      velQ2.clear();
-    }
-
-
-    // communicate the number of particles iRank needs to all other ranks
-    MyIDType nParticles;
-    if (iRank==mpiMgr.rank())
-      nParticles=numberOfRequiredRemoteParticleIds;
-    mpiMgr.bcastRaw(&nParticles, 1, iRank);
-
-
-    // communicate the actual particle Ids iRank needs to all other ranks
-    vector<MyIDType> needParticleIds;
-    needParticleIds.clear();
-    //
-    if (iRank==mpiMgr.rank())
-      needParticleIds=requiredRemoteParticleIds;
-    else
-      needParticleIds.resize(nParticles);
-    //
-    mpiMgr.bcastRaw(&needParticleIds[0], nParticles/*no sizeof() needed here!!!*/, iRank);
-
-
-    // in each rank, we build an index for the particles iRank needs
-    vector<MyIDType> needIdx;
-    needIdx.clear();
-    buildIndex(needParticleIds.begin(),needParticleIds.end(),needIdx);
-
-
-    // now we need to find out if the current rank has some of the particles needed by iRank
-    int haveNParticleIds;   haveNParticleIds = 0;
-    // save particle data if it is found
-    vector<MyIDType>     haveParticleId;    haveParticleId.clear();
-    vector<particle_sim> haveParticleData;  haveParticleData.clear();
-    vector<vec3f>        haveParticleVel;   haveParticleVel.clear();
-    //
-    if (   (!patch_data)
-        || ((patch_data)&&(iRank!=mpiMgr.rank())))
-    {
-      if (debug_msg)
-        cout << "MpiFetchRemoteParticles() : Redistributing required particles -- searching, iRank=" << iRank << endl << flush;
-
-      tsize i1=0, i2=0;
-      while(i1<needParticleIds.size() && i2<p2.size())
-      {
-        if (needParticleIds[needIdx[i1]]==id2[idx2[i2]])
-        {
-          // particle is present in both, needParticleIds *and* id2
-          haveParticleId.push_back(   id2[idx2[i2]] );
-          haveParticleData.push_back(  p2[idx2[i2]] );
-          if (interpol_mode >1)
-            haveParticleVel.push_back(  vel2[idx2[i2]] );
-          haveNParticleIds++;
-          i1++;
-          i2++;
-        }
-        else if (needParticleIds[needIdx[i1]]<id2[idx2[i2]])
-        {
-          // particle is present in needParticleIds but not in id2
-          i1++;
-        }
-        else if (needParticleIds[needIdx[i1]]>id2[idx2[i2]])
-        {
-          // particle is present in id2 but not in needParticleIds
-          i2++;
-        }
-      }
-    }
-    mpiMgr.barrier();
-
-
-    // now we need to communicate back to iRank
-    // the number of particles each rank has to offer
-    vector<int> numberOfParticlesFromRank;
-    numberOfParticlesFromRank.clear();
-    {
-      arr<int> numPartTmp;
-      numPartTmp.alloc(mpiMgr.num_ranks());
-      // for convenience, we use gather_m which supports the arr datatype
-      mpiMgr.gather_m(haveNParticleIds, numPartTmp, iRank);
-      //
-      if (iRank==mpiMgr.rank())
-      {
-        for (int jRank=0; jRank<mpiMgr.num_ranks(); jRank++)
-        {
-          numberOfParticlesFromRank.push_back( numPartTmp[jRank] );
-        }
-        if (debug_msg)
-        {
-          cout << "MpiFetchRemoteParticles() : numberOfParticlesFromRank, jRank" << endl;
-          for (int jRank=0; jRank<mpiMgr.num_ranks(); jRank++)
-          {
-            cout << "   " << numberOfParticlesFromRank[jRank] << ", " << jRank << endl;
-          }
-          cout << flush;
-        }
-      }
-      numPartTmp.dealloc();
-    }
-    mpiMgr.barrier();
-
-
-    // now we need to actually communicate the particle data and the Ids back to iRank
-    //
-    if (debug_msg)
-      cout << "MpiFetchRemoteParticles() : Redistributing required particles -- sending particle IDs, iRank=" << iRank << endl << flush;
-
-    // exchange particle IDs
-    for (int jRank=0; jRank<mpiMgr.num_ranks(); jRank++)
-    {
-      if (iRank!=jRank)
-      {
-        if (iRank==mpiMgr.rank())
-        {
-          // receive particle Ids
-          vector<MyIDType> idQ2Tmp;
-          idQ2Tmp.resize( numberOfParticlesFromRank[jRank] );
-          // receive particle_sim objects from rank jRank
-          mpiMgr.recvRawVoid(&(idQ2Tmp[0]), NAT_CHAR, numberOfParticlesFromRank[jRank]*sizeof(MyIDType), jRank);
-          // append these objects to q2
-          for (vector<MyIDType>::iterator it=idQ2Tmp.begin(); it!=idQ2Tmp.end(); ++it)
-          {
-            idQ2.push_back(*it);
-          }
-          idQ2Tmp.clear();
-        }
-        else if (jRank==mpiMgr.rank())
-        {
-          // send particle Ids
-          mpiMgr.sendRawVoid(&(haveParticleId[0]), NAT_CHAR, haveParticleId.size()*sizeof(MyIDType), iRank);
-        }
-      }
-      else // (iRank==jRank)
-      {
-        if ((!patch_data) && (iRank==mpiMgr.rank()))
-          idQ2.insert(idQ2.end(), haveParticleId.begin(), haveParticleId.end());
-      }
-      mpiMgr.barrier();
-    } // end of particle id exchange loop
-
-    if (debug_msg)
-      cout << "MpiFetchRemoteParticles() : Redistributing required particles -- sending particle data, iRank=" << iRank << endl << flush;
-
-    // exchange particle data (particle_sim)
-    for (int jRank=0; jRank<mpiMgr.num_ranks(); jRank++)
-    {
-      if (iRank!=jRank)
-      {
-        if (iRank==mpiMgr.rank())
-        {
-          // receive particle data
-          vector<particle_sim> q2Tmp;
-          q2Tmp.resize( numberOfParticlesFromRank[jRank] );
-          // receive particle_sim objects from rank jRank
-          tsize nBytes=numberOfParticlesFromRank[jRank]*sizeof(particle_sim);
-          //
-          // TODO : cut MPI message into pieces
-          planck_assert(nBytes < std::numeric_limits<int>::max(), "Ooops, too many elements in MPI message.");
-          //
-          tsize source=jRank;
-          if (debug_msg)
-            cout << "nBytes, source : " << nBytes << ", " << source << endl << flush;
-          //
-          mpiMgr.recvRawVoid(&(q2Tmp[0]), NAT_CHAR, nBytes, source);
-          // append these objects to q2
-          for (vector<particle_sim>::iterator it=q2Tmp.begin(); it!=q2Tmp.end(); ++it)
-          {
-            q2.push_back(*it);
-          }
-          q2Tmp.clear();
-        }
-        else if (jRank==mpiMgr.rank())
-        {
-          // send particle data
-          tsize nBytes=haveParticleData.size()*sizeof(particle_sim);
-          //
-          // TODO : cut MPI message into pieces
-          planck_assert(nBytes<std::numeric_limits<int>::max(), "Ooops, too many elements in MPI message.");
-          //
-          tsize target=iRank;
-          if (debug_msg)
-            cout << "nBytes, target : " << nBytes << ", " << target << endl << flush;
-          //
-          mpiMgr.sendRawVoid(&(haveParticleData[0]), NAT_CHAR, nBytes, target);
-        }
-      }
-      else // (iRank==jRank)
-      {
-        if ((!patch_data) && (iRank==mpiMgr.rank()))
-          q2.insert(q2.end(), haveParticleData.begin(), haveParticleData.end());
-      }
-      mpiMgr.barrier();
-    } // end of particle data exchange loop
-
-    // exchange particle velocities
-    if (interpol_mode>1)
-    {
-      for (int jRank=0; jRank<mpiMgr.num_ranks(); jRank++)
-      {
-        if (iRank!=jRank)
-        {
-          if (iRank==mpiMgr.rank())
-          {
-            // receive particle data
-            vector<vec3f> velQ2Tmp;
-            velQ2Tmp.resize( numberOfParticlesFromRank[jRank] );
-            // receive particle_sim objects from rank jRank
-            tsize nBytes=numberOfParticlesFromRank[jRank]*sizeof(vec3f);
-            //
-            // TODO : cut MPI message into pieces
-            planck_assert(nBytes < std::numeric_limits<int>::max(), "Ooops, too many elements in MPI message.");
-            //
-            tsize source=jRank;
-            if (debug_msg)
-              cout << "nBytes, source : " << nBytes << ", " << source << endl << flush;
-            //
-            mpiMgr.recvRawVoid(&(velQ2Tmp[0]), NAT_CHAR, nBytes, source);
-            // append these objects to velQ2
-            for (vector<vec3f>::iterator it=velQ2Tmp.begin(); it!=velQ2Tmp.end(); ++it)
-            {
-              velQ2.push_back(*it);
-            }
-            velQ2Tmp.clear();
-          }
-          else if (jRank==mpiMgr.rank())
-          {
-            // send particle data
-            tsize nBytes=haveParticleVel.size()*sizeof(vec3f);
-            //
-            // TODO : cut MPI message into pieces
-            planck_assert(nBytes<std::numeric_limits<int>::max(), "Ooops, too many elements in MPI message.");
-            //
-            tsize target=iRank;
-            if (debug_msg)
-              cout << "nBytes, target : " << nBytes << ", " << target << endl << flush;
-            //
-            mpiMgr.sendRawVoid(&(haveParticleVel[0]), NAT_CHAR, nBytes, target);
-          }
-        }
-        else // (iRank==jRank)
-        {
-          if ((!patch_data) && (iRank==mpiMgr.rank()))
-            velQ2.insert(velQ2.end(), haveParticleVel.begin(), haveParticleVel.end());
-        }
-        mpiMgr.barrier();
-      } // end of particle velocities exchange loop
-    }
-
-    if (debug_msg)
-      cout << "MpiFetchRemoteParticles() : end of iRank loop ..." << endl << flush;
-
-  } // end of the outer loop over iRank
-
-  mpiMgr.barrier();
-
-  // Status: On each MPI process, the vectors
-  //   idQ2 hold the particle Ids for "remote" particles,
-  //   q2   holds the particle data - " -
-  if (debug_msg)
-  {
-    cout << "MpiFetchRemoteParticles() : appending remote particles ..." << endl;
-    cout << "p1Size, id1Size  : " << p1.size() << ", " << id1.size()  << endl;
-    cout << "p2Size, id2Size  : " << p2.size() << ", " << id2.size()  << endl;
-    cout << "q2Size, idQ2Size : " << q2.size() << ", " << idQ2.size() << endl << flush;
-  }
-
-  if (patch_data)
-  {
-    for (vector<MyIDType>::iterator it=idQ2.begin(); it!=idQ2.end(); ++it)
-    {
-      id2.push_back(*it);
-    }
-    for (vector<particle_sim>::iterator it=q2.begin(); it!=q2.end(); ++it)
-    {
-      p2.push_back(*it);
-    }
-    if (interpol_mode > 1)
-    {
-      for (vector<vec3f>::iterator it=velQ2.begin(); it!=velQ2.end(); ++it)
-      {
-        vel2.push_back(*it);
-      }
-    }
-  }
-  else
-  {
-    id2.swap(idQ2);
-    p2.swap(q2);
-    vel2.swap(velQ2);
-  }
-
-  idQ2.clear();
-  q2.clear();
-  velQ2.clear();
-
-  if (debug_msg)
-    cout << "MpiFetchRemoteParticles() : recreating index idx2 ..." << endl << flush;
-
-  tstack_replace("Fetch remote particles","Particle index generation");
-  idx2.clear();
-  buildIndex(id2.begin(), id2.end(), idx2);
-  tstack_replace("Particle index generation","Fetch remote particles");
-
-  mpiMgr.barrier();
-
-  if (debug_msg)
-    cout << "MpiFetchRemoteParticles() : END" << endl << flush;
-
-  return;
-}
-
-// MpiStripRemoteParticles() removes particles from p2
-void sceneMaker::MpiStripRemoteParticles ()
-{
-  if (mpiMgr.num_ranks()==1)
-    return;
-
-  bool debug_msg  = params.find<bool>("mpi_interpolation_debug_msg",false);
-  bool patch_data = params.find<bool>("mpi_interpolation_patch_data",true);
-  bool reread_data= params.find<bool>("mpi_interpolation_reread_data",false);
-
-  if (reread_data)
-  {
-    p2.clear();
-    id2.clear();
-    idx2.clear();
-    vel2.clear();
-  }
-  else
-  {
-    if (patch_data)
-    {
-      if (debug_msg)
-          cout << "MpiStripRemoteParticles() : removing remote data ..." << endl << flush;
-
-      p2.erase(  p2.begin() + numberOfLocalParticles,  p2.end());
-      id2.erase(id2.begin() + numberOfLocalParticles, id2.end());
-      if (interpol_mode > 1)
-        vel2.erase(vel2.begin() + numberOfLocalParticles, vel2.end());
-
-      if (debug_msg)
-        cout << "MpiStripRemoteParticles() : regenerating idx2 ..." << endl << flush;
-
-      tstack_replace("Fetch remote particles","Particle index generation");
-      idx2.clear();
-      buildIndex(id2.begin(), id2.end(), idx2);
-      tstack_replace("Particle index generation","Fetch remote particles");
-    }
-    else
-    {
-      p2.swap(p2Backup);
-      id2.swap(id2Backup);
-      idx2.swap(idx2Backup);
-      vel2.swap(vel2Backup);
-      p2Backup.clear();
-      id2Backup.clear();
-      idx2Backup.clear();
-      vel2Backup.clear();
-    }
-  }
-
-  return;
-}
-
 #endif

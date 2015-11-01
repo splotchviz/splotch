@@ -18,6 +18,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
+
 #ifndef SPLOTCHUTILS_H
 #define SPLOTCHUTILS_H
 
@@ -40,7 +41,7 @@
 #define MyMaxID ULLONG_MAX
 #else
 #define MyIDType uint32
-#define MyMaxID ULONG_MAX
+#define MyMaxID UINT_MAX
 #endif
 
 struct particle_sim
@@ -61,7 +62,7 @@ struct particle_sim
 struct zcmp
   {
   bool operator()(const particle_sim &p1, const particle_sim &p2) const
-    { return p1.z>p2.z; }
+    { return p1.z<p2.z; }
   };
 
 struct vcmp1
@@ -192,7 +193,7 @@ void get_colourmaps (paramfile &params, std::vector<COLOURMAP> &amap, VisIVOServ
 void get_colourmaps (paramfile &params, std::vector<COLOURMAP> &amap);
 #endif
 double my_asinh (double val);
-
 bool file_present(const std::string &name);
-
+void checkrth(float r_th, int npart, std::vector<particle_sim>& p, paramfile &params);
+void checkbbox(std::vector<particle_sim>& p);
 #endif // SPLOTCHUTILS_H
