@@ -30,11 +30,10 @@ namespace previewer
 		particleList = pData.GetParticleList();
 		dataBBox = pData.GetBoundingBox();
 
-		DebugPrint("Generating VBO...");
+		DebugPrint("Generating VBO...\n");
 		// Create the display list for particle drawing
 		genVBO();
-
-		DebugPrint("Generated");
+		
 		// Set up GUI
 
 		// Set up material

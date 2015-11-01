@@ -29,7 +29,6 @@ namespace previewer
 	// Implement the constructor
 	OnMotionEvent::OnMotionEvent()
 	{
-		DebugPrint("OnMotion Event Subscription");
 
 		if(!eventSubs)
 		{
@@ -43,7 +42,6 @@ namespace previewer
 	// Implement the destructor
 	OnMotionEvent::~OnMotionEvent()
 	{
-		DebugPrint("OnMotion Event Unsubscription");
  
 		// Remove the subclass from the subscribers list
 		eventSubs->remove(dynamic_cast<OnMotionEvent*>(this));

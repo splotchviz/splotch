@@ -52,7 +52,7 @@ namespace previewer
 
 			// Indicate if not file found
 			if(!file)
-				std::cout << "shader text file not found" << std::endl;
+				ErrorMessage("Text file not found: %s", filename.c_str());
 
 			char* data = 0;
 			int size = 0;
@@ -64,9 +64,7 @@ namespace previewer
 
 			// Indicate if file is empty
 			if(!size)
-			{
-				std::cout << "shader file is empty!" << std::endl;
-			}
+				ErrorMessage("Text file empty: %s", filename.c_str());
 
 			// Create buffer for data
 			data = new char[size+1];
@@ -90,7 +88,7 @@ namespace previewer
 			std::ifstream file(filename.c_str(), std::ios::in | std::ios::binary);
 
 			if(!file)
-				std::cout << "tga loader: TGA image file not found" << std::endl;
+				ErrorMessage("TGA loader: TGA image file not found %s\n", filename.c_str());
 
 			unsigned char imageTypeInfo[4];
 			unsigned char imageDataInfo[6];
@@ -108,7 +106,7 @@ namespace previewer
 			int imageType = imageTypeInfo[2];
 
 			if (colourMapPresent || (imageType != 2 && imageType != 3))
-				std::cout << "tga loader: unsupported tga type" << std::endl;
+				ErrorMessage("TGA loader: unsupported TGA type\n");
 
 			//get height, width and bits per pixel (pixel depth)
 			//stored as 2 bytes 
@@ -119,7 +117,7 @@ namespace previewer
 
 			//check image has 24/32 bpp
 			if(bpp != 24 && bpp != 32)
-				std::cout << "tga loader: unsupported pixel depth" << std::endl;
+				ErrorMessage("TGA loader: unsupported pixel depth %i\n", bpp);
 			
 			//calculate size of data in bytes (bitsPP>>3 == bytesPP)
 			long dataSize = width * height * (bpp>>3);
@@ -209,22 +207,21 @@ namespace previewer
 			{
 				// Check if colour is vector, if so there will be no colourmap to load
 				if (splotchParams->find<bool>("color_is_vector"+dataToString(i),false))
-					std::cout << " color of ptype " << i << " is vector, so no colormap to load ..." << std::endl;
+					DebugPrint("Color of ptype %i is vector, so no colormap to load\n",i);
 				else
 				{
 					// Read palette file
 					std::ifstream infile (splotchParams->find<std::string>("palette"+dataToString(i)).c_str());
 					if(!infile)
 					{
-						std::cout << "Could not open palette file "<< splotchParams->find<std::string>("palette"+dataToString(i)).c_str() << " for " << "palette"+dataToString(i) << std::endl;
-						return 0;
+						ErrorMessage("Could not open palette file %s for palette%s\n",splotchParams->find<std::string>(dataToString(i)).c_str(), dataToString(i).c_str());
 					}
 
 					// Get number of colours in palette
 					std::string dummy;
 					int nColours;
 					infile >> dummy >> dummy >> nColours;
-					std::cout << " loading " << nColours << " entries of color table of ptype " << i << std::endl;
+					DebugPrint("Loading %i entries for color table of ptype %i\n",nColours, i);
 
 					// Load
 					double step = 1./(nColours-1);

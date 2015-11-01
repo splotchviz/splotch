@@ -25,17 +25,15 @@ namespace previewer
 {
 		void Parameter::Load(std::string filename)
 		{
-			DebugPrint("Loading parameter file supplied");
-			DebugPrint("Parameter File:", filename);
+			DebugPrint("Loading parameter file: %s\n", filename.c_str());
 
 			paramFileReference = paramfile(filename, false);
 
-			DebugPrint("Splotch Parameter File Read Completed");
 		}
 
 		void Parameter::Load()
 		{
-			DebugPrint("Loading parameter with no file supplied");
+			DebugPrint("Loading parameter with no file supplied\n");
 		}
 
 		void Parameter::Run()
@@ -45,7 +43,7 @@ namespace previewer
 
 		void Parameter::Unload()
 		{
-			DebugPrint("Unloading parameter system");
+			DebugPrint("Unloading parameter system\n");
 		}
 
 		paramfile* Parameter::GetParamFileReference()
@@ -55,7 +53,7 @@ namespace previewer
 
 		void Parameter::WriteParameterFile(std::string fileName)
 		{
-			DebugPrint("Writing Parameter file");
+			DebugPrint("Writing Parameter file\n");
 
 			// Get Out File Stream and Open the File
 			std::ofstream file;

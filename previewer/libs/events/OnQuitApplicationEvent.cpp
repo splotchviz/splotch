@@ -30,7 +30,6 @@ namespace previewer
 	// Implement the constructor
 	OnQuitApplicationEvent::OnQuitApplicationEvent()
 	{
-		DebugPrint("OnQuitApplication Event Subscription");
 
 		if(!eventSubs)
 		{
@@ -44,7 +43,6 @@ namespace previewer
 	// Implement the destructor
 	OnQuitApplicationEvent::~OnQuitApplicationEvent()
 	{
-		DebugPrint("OnQuitApplication Event Unsubscription");
 
 		// Remove the subclass from the subscribers list
 		eventSubs->remove(dynamic_cast<OnQuitApplicationEvent*>(this));
@@ -53,7 +51,6 @@ namespace previewer
 	// Implement the Caller
 	void OnQuitApplicationEvent::CallEvent(Event ev)
 	{
-		DebugPrint("OnQuitApplication Event Call");
 
 		if(eventSubs)
 		{

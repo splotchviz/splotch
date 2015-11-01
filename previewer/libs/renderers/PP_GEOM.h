@@ -44,6 +44,7 @@ namespace previewer
 
 		void OnKeyPress(Event);
 		void OnMotion(Event);
+		void OnButtonpress(Event){};
 
 	private:	
 		void genVBO();

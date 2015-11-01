@@ -26,6 +26,7 @@ namespace previewer
 {
 	void PP_FBO::Load(const ParticleData& pData)
 	{
+		DebugPrint("Loading PP_FBO renderer\n");
 		//Store passed in data and bounding box
 		particleList = pData.GetParticleList();
 		dataBBox = pData.GetBoundingBox();
@@ -33,8 +34,8 @@ namespace previewer
 		paramfile* splotchParams = Previewer::parameterInfo.GetParamFileReference();
 
 		// Create the VBO for particle drawing
+		DebugPrint("Generating VBO\n");
 		genVBO();
-
 		PrintOpenGLError();
 
 		// Create material
@@ -88,18 +89,19 @@ namespace previewer
 			vec3f sky(splotchParams->find<double>("sky_x",0),splotchParams->find<double>("sky_y",0),splotchParams->find<double>("sky_z",1));
 			vec3f campos(splotchParams->find<double>("camera_x",0),splotchParams->find<double>("camera_y",0),splotchParams->find<double>("camera_z",1));
 
-			camera.Create(campos,lookat,(sky*=-1));
+			// Negate sky because of differences in previewer and splotch camera setups
+			camera.Create(campos,lookat,-sky);
 		}
 
 		camera.SetMainCameraStatus(true);
 
 		// Set up passthrough FBO
-		DebugPrint("Before passthrough FBO Setup");
+		DebugPrint("Passthrough FBO Setup\n");
 		PrintOpenGLError();
 
 		Fbo_Passthrough.Load(ParticleSimulation::GetXRes(), ParticleSimulation::GetYRes());
 
-		DebugPrint("After passthrough FBO Setup");
+		DebugPrint("After passthrough FBO setup\n");
 		PrintOpenGLError();
 
 		GLuint fboPTTex = Fbo_Passthrough.GetTexID();
@@ -110,20 +112,20 @@ namespace previewer
 		fboPTMaterial->LoadTexture(fboPTTex, GL_TEXTURE_2D);
 
 		// Set up ToneMapping FBO
-		DebugPrint("Before ToneMapping FBO Setup");
+		DebugPrint("Before ToneMapping FBO Setup\n");
 		PrintOpenGLError();
 
-		 Fbo_ToneMap.Load(ParticleSimulation::GetXRes(), ParticleSimulation::GetYRes());
+		Fbo_ToneMap.Load(ParticleSimulation::GetXRes(), ParticleSimulation::GetYRes());
 
-		DebugPrint("After ToneMapping FBO Setup");
+		DebugPrint("After ToneMapping FBO Setup\n");
 		PrintOpenGLError();
 
-		 GLuint fboTMTex = Fbo_ToneMap.GetTexID();
+		GLuint fboTMTex = Fbo_ToneMap.GetTexID();
 
-		 fboTMMaterial = new PP_ParticleMaterial();
-		 fboTMMaterial->Load(ParticleSimulation::GetExePath()+"previewer/data/shaders/FBO_ToneMap", false);
-		 fboTMMaterial->SetTexture(true);
-		 fboTMMaterial->LoadTexture(fboTMTex, GL_TEXTURE_2D);
+		fboTMMaterial = new PP_ParticleMaterial();
+		fboTMMaterial->Load(ParticleSimulation::GetExePath()+"previewer/data/shaders/FBO_ToneMap", false);
+		fboTMMaterial->SetTexture(true);
+		fboTMMaterial->LoadTexture(fboTMTex, GL_TEXTURE_2D);
 
 		// Set identity matrix for drawin rtt quad to screen
 		ident.identity();
@@ -248,38 +250,55 @@ namespace previewer
 		else if(ev.keyID == "e")
 				camera.MoveUpward(-ParticleSimulation::GetMoveSpeed()*50*WindowManager::GetElapsedTime());
 
+		// else if(ev.keyID == "i")
+		// 		camera.RotateAroundTarget(dataBBox.centerPoint, 0.0,ParticleSimulation::GetRotationSpeed()*0.1*WindowManager::GetElapsedTime(),0.0);
+
+		// else if(ev.keyID == "j")
+		// 		camera.RotateAroundTarget(dataBBox.centerPoint, ParticleSimulation::GetRotationSpeed()*0.1*WindowManager::GetElapsedTime(),0.0,0.0);
+
+		// else if(ev.keyID == "k")
+		// 		camera.RotateAroundTarget(dataBBox.centerPoint, 0.0,-ParticleSimulation::GetRotationSpeed()*0.1*WindowManager::GetElapsedTime(),0.0);
+
+		// else if(ev.keyID == "l")
+		// 		camera.RotateAroundTarget(dataBBox.centerPoint, -ParticleSimulation::GetRotationSpeed()*0.1*WindowManager::GetElapsedTime(),0.0,0.0);
+
 		else if(ev.keyID == "i")
-				camera.RotateAroundTarget(dataBBox.centerPoint, 0.0,ParticleSimulation::GetRotationSpeed()*0.1*WindowManager::GetElapsedTime(),0.0);
+				camera.Rotate(0.0,ParticleSimulation::GetRotationSpeed()*0.1*WindowManager::GetElapsedTime(),0.0);
 
 		else if(ev.keyID == "j")
-				camera.RotateAroundTarget(dataBBox.centerPoint, ParticleSimulation::GetRotationSpeed()*0.1*WindowManager::GetElapsedTime(),0.0,0.0);
+				camera.Rotate(ParticleSimulation::GetRotationSpeed()*0.1*WindowManager::GetElapsedTime(),0.0,0.0);
 
 		else if(ev.keyID == "k")
-				camera.RotateAroundTarget(dataBBox.centerPoint, 0.0,-ParticleSimulation::GetRotationSpeed()*0.1*WindowManager::GetElapsedTime(),0.0);
+				camera.Rotate(0.0,-ParticleSimulation::GetRotationSpeed()*0.1*WindowManager::GetElapsedTime(),0.0);
 
 		else if(ev.keyID == "l")
-				camera.RotateAroundTarget(dataBBox.centerPoint, -ParticleSimulation::GetRotationSpeed()*0.1*WindowManager::GetElapsedTime(),0.0,0.0);
-
+				camera.Rotate(-ParticleSimulation::GetRotationSpeed()*0.1*WindowManager::GetElapsedTime(),0.0,0.0);
 	}
 
 	void PP_FBO::OnMotion(Event ev)
 	{
-		//account for mouse moving around screen between clicks or going off the render screen
-		if( (ev.mouseX > (mouseMotionX + 10.f)) || (ev.mouseX < (mouseMotionX - 10.f)) || 
-			(ev.mouseX > ParticleSimulation::GetRenderXMax()) || (ev.mouseX < ParticleSimulation::GetRenderXMin()) ||
-			 (ev.mouseY > ParticleSimulation::GetRenderYMax()) || (ev.mouseY < ParticleSimulation::GetRenderYMin())  )
+		// //account for mouse moving around screen between clicks or going off the render screen
+		// if( (ev.mouseX > (mouseMotionX + 10.f)) || (ev.mouseX < (mouseMotionX - 10.f)) || 
+		// 	(ev.mouseX > ParticleSimulation::GetRenderXMax()) || (ev.mouseX < ParticleSimulation::GetRenderXMin()) ||
+		// 	 (ev.mouseY > ParticleSimulation::GetRenderYMax()) || (ev.mouseY < ParticleSimulation::GetRenderYMin())  )
 
-			mouseMotionX = ev.mouseX;
-		if( (ev.mouseY > (mouseMotionY + 10.f)) || (ev.mouseY < (mouseMotionY - 10.f)) ||
-		 	(ev.mouseY > ParticleSimulation::GetRenderYMax()) || (ev.mouseY < ParticleSimulation::GetRenderYMin()) ||
-		 	(ev.mouseX > ParticleSimulation::GetRenderXMax()) || (ev.mouseX < ParticleSimulation::GetRenderXMin()) )
-			mouseMotionY = ev.mouseY;
+		// 	mouseMotionX = ev.mouseX;
+		// if( (ev.mouseY > (mouseMotionY + 10.f)) || (ev.mouseY < (mouseMotionY - 10.f)) ||
+		//  	(ev.mouseY > ParticleSimulation::GetRenderYMax()) || (ev.mouseY < ParticleSimulation::GetRenderYMin()) ||
+		//  	(ev.mouseX > ParticleSimulation::GetRenderXMax()) || (ev.mouseX < ParticleSimulation::GetRenderXMin()) )
+		// 	mouseMotionY = ev.mouseY;
 
 		float xRot = (mouseMotionX - ev.mouseX)*0.1f; //*time elapsed in frame
 		float yRot = (mouseMotionY - ev.mouseY)*0.1f;
 
-		camera.Rotate(xRot, yRot, 0.f);
+		camera.RotateAroundTarget(xRot, -yRot, 0.f);
 
+		mouseMotionX = ev.mouseX;
+		mouseMotionY = ev.mouseY;
+	} 
+
+	void PP_FBO::OnButtonPress(Event ev)
+	{
 		mouseMotionX = ev.mouseX;
 		mouseMotionY = ev.mouseY;
 	} 
@@ -289,7 +308,7 @@ namespace previewer
 
 		// Generate Vertex Buffer Object with space reserved for data, then insert interleaved data.
 		int bufferSize = (particleList.size()*sizeof(particle_sim));
-		std::cout << "buffer size: " << bufferSize << std::endl;
+		DebugPrint("VBO size: %i\n",bufferSize);
 		glGenBuffers(1, &VBO);	
 		glBindBuffer(GL_ARRAY_BUFFER, VBO);
 		glBufferData(GL_ARRAY_BUFFER, bufferSize, 0, GL_STATIC_DRAW); //pass 0 to reserve space

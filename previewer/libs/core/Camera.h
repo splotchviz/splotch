@@ -77,6 +77,7 @@ namespace previewer
 		// Makes the camera look at a bounding box
 		void LookAtBox(BoundingBox);
 		void LookAtBox(BoundingBox, int);
+		void SetTarget(vec3f);
 
 		// Rotation functionality - all do the same thing or as they say
 		void Rotate(vec3f);
@@ -84,7 +85,7 @@ namespace previewer
 		void RotateYaw(float);
 		void RotatePitch(float);
 		void RotateRoll(float);
-		void RotateAroundTarget(vec3f, float, float, float);
+		void RotateAroundTarget(float, float, float);
 
 		// Move functions relative to world axes 
 		void Move(vec3f);
@@ -120,6 +121,7 @@ namespace previewer
 		// Camera positions and targets including orientation
 		vec3f cameraPosition;
 		vec3f cameraLookAt; // Relative to cameraPosition (normalised directional vector)
+		vec3f cameraTarget; // Setable target point to lookat/rotate around
 		vec3f cameraUpVector;
 		vec3f cameraRightVector;
 

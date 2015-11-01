@@ -30,7 +30,7 @@ namespace previewer
 
 	void AnimationSimulation::Load(std::string _exepath)
 	{
-		DebugPrint("Animation Simulation has been loaded");
+		DebugPrint("Animation Simulation has been loaded\n");
 
 		exepath = _exepath;
 		// Reset frame and demo status
@@ -58,14 +58,14 @@ namespace previewer
 
 	void AnimationSimulation::Unload()
 	{
-		DebugPrint("Unloading Animation Simulation");
+		DebugPrint("Unloading Animation Simulation\n");
 	}
 
 	void AnimationSimulation::PlayDemo()
 	{
 
-		DebugPrint("Demo is playing, frame:", currentFrame);
-		DebugPrint("Out of total: ", totalFrames);
+		DebugPrint("Demo is playing, frame: %i\n", currentFrame);
+		DebugPrint("Out of total: %i\n", totalFrames);
 
 		// Set previewer settings relative to animation path current frame
 		vec3f newLookAt = vec3f(0.0,0.0,0.0);
@@ -74,35 +74,35 @@ namespace previewer
 			{
 				if(animationPaths[i].GetComponent() == "camera")
 				{
-					DebugPrint("camera component detected - animpath: ", (int)i );
+					DebugPrint("camera component detected - animpath: %i\n", (int)i );
 					if(animationPaths[i].GetParameter() == "camera_x")
 					{
-						DebugPrint("parameter posX");
+						DebugPrint("parameter posX\n");
 						CameraAction::CallMoveCameraAction(vec3f(std::atof(animationPaths[i].GetInterpolatedDataPointList()[currentFrame].value.c_str()), 0, 0), XCOORD);
 					}
 					else if(animationPaths[i].GetParameter() == "camera_y")
 					{
-						DebugPrint("parameter posY");
+						DebugPrint("parameter posY\n");
 						CameraAction::CallMoveCameraAction(vec3f(0, std::atof(animationPaths[i].GetInterpolatedDataPointList()[currentFrame].value.c_str()), 0), YCOORD);
 					}
 					else if(animationPaths[i].GetParameter() == "camera_z")
 					{
-						DebugPrint("parameter posZ");
+						DebugPrint("parameter posZ\n");
 						CameraAction::CallMoveCameraAction(vec3f(0, 0, std::atof(animationPaths[i].GetInterpolatedDataPointList()[currentFrame].value.c_str())), ZCOORD);
 					}
 					else if(animationPaths[i].GetParameter() == "lookat_x")
 					{
-						DebugPrint("parameter lookAtX");
+						DebugPrint("parameter lookAtX\n");
 						newLookAt.x = std::atof(animationPaths[i].GetInterpolatedDataPointList()[currentFrame].value.c_str());
 					}
 					else if(animationPaths[i].GetParameter() == "lookat_y")
 					{
-						DebugPrint("parameter lookAtY");
+						DebugPrint("parameter lookAtY\n");
 						newLookAt.y = std::atof(animationPaths[i].GetInterpolatedDataPointList()[currentFrame].value.c_str());
 					}
 					else if(animationPaths[i].GetParameter() == "lookat_z")
 					{
-						DebugPrint("parameter lookAtZ");
+						DebugPrint("parameter lookAtZ\n");
 						newLookAt.z = std::atof(animationPaths[i].GetInterpolatedDataPointList()[currentFrame].value.c_str());
 					}
 				}
@@ -149,14 +149,14 @@ namespace previewer
 	// Load animation file
 	void AnimationSimulation::LoadAnimFile()
 	{
-		DebugPrint("Loading file");
+		DebugPrint("Loading file\n");
 		if(animation.LoadAnimDataFile(currentFile))
 		{
-			DebugPrint("File Loaded");
+			DebugPrint("File Loaded\n");
 			animationPaths = animation.GetPaths();
-			DebugPrint("Got Paths");
+			DebugPrint("Got Paths\n");
 			totalFrames = animationPaths[0].GetInterpolatedDataPointList().size();
-			DebugPrint("Got total framecount: ", totalFrames);
+			DebugPrint("Got total framecount: %i\n", totalFrames);
 			//fileReady = true;
 		}
 		else
@@ -310,14 +310,14 @@ namespace previewer
 	void AnimationSimulation::SetAnimationPoint(std::string dataPoint, std::string component, std::string parameter, int interpType)
 	{
 		// Add point to list
-		DebugPrint("Adding Point");
+		DebugPrint("Adding Point\n");
 		animation.AddPoint(dataPoint, component, parameter, interpType, timeValue);
 	}
 
 	void AnimationSimulation::Interpolate()
 	{
 			// Interpolate and store interpolated paths
-			DebugPrint("Animation Simulation: Interpolating");
+			DebugPrint("Animation Simulation: Interpolating\n");
 			animation.InterpolatePaths();
 			animationPaths = animation.GetPaths();
 			totalFrames = animation.GetTotalFrames();
@@ -356,21 +356,21 @@ namespace previewer
 
 	void AnimationSimulation::SetPoint()
 	{
-		DebugPrint("Setting points for all animation elements");
+		DebugPrint("Setting points for all animation elements\n");
 
-		DebugPrint("Setting Animation Point: camposx");
+		DebugPrint("Setting Animation Point: camposx\n");
 		vec3f campos = vec3f(0.0,0.0,0.0);
 		CameraAction::CallGetCameraPosAction(campos);
 		SetAnimationPoint(Utils::ToString(campos.x), "camera", "camera_x", cameraInterpType);
-		DebugPrint("Setting Animation Point: camposy type: ", cameraInterpType);
+		DebugPrint("Setting Animation Point: camposy type: %i\n", cameraInterpType);
 		campos = vec3f(0.0,0.0,0.0);
 		CameraAction::CallGetCameraPosAction(campos);
 		SetAnimationPoint(Utils::ToString(campos.y), "camera", "camera_y", cameraInterpType);
-		DebugPrint("Setting Animation Point: camposz");
+		DebugPrint("Setting Animation Point: camposz\n");
 		campos = vec3f(0.0,0.0,0.0);
 		CameraAction::CallGetCameraPosAction(campos);
 		SetAnimationPoint(Utils::ToString(campos.z), "camera", "camera_z", cameraInterpType);
-		DebugPrint("Setting animation points: lookat");
+		DebugPrint("Setting animation points: lookat\n");
 		vec3f camLookAt;
 		CameraAction::CallGetCameraLookAtAction(camLookAt);
 		SetAnimationPoint(Utils::ToString(camLookAt.x), "camera", "lookat_x", lookatInterpType);

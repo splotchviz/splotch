@@ -22,48 +22,118 @@
 //Debug include
 #include "previewer/libs/core/Debug.h"
 
-void DebugPrint(std::string s)
+// Variadic messages, simple printf style functions, e.g:
+// ErrorMessage("Load failed! %i", error_code_int);
+// DebugPrint("string here %i", anInteger);
+//
+// Format:
+// i int; u unsigned int; f double; s cstring; p ptr address;  
+// Can use \n for new line
+
+void ErrorMessage(const char* s, ...)
+{
+	std::cout << "\n\nPreviewer Error: ";
+	va_list args;
+	va_start(args, s);
+	while(*s != '\0')
+	{
+		if(*s=='%')
+		{
+			++s;
+			switch(*s)
+			{
+				case 'i':
+					std::cout << va_arg(args, int);
+				break;
+				case 'u':
+					std::cout << va_arg(args, unsigned int);
+				break;
+				case 'f':
+					std::cout << va_arg(args, double);
+				break;
+				case 's':
+					std::cout << std::string(va_arg(args, const char*));
+				break;
+				case 'p':
+					std::cout << va_arg(args, void*);
+				break;
+				default:
+				std::cout << "%?";
+				break;
+			}
+		}
+		else if(*s == '\n')
+		{
+			std::cout << std::endl;
+		}
+		else 
+		{
+			putchar(*s);
+		}
+		++s;
+	}
+	std::cout << "In file: " << __FILE__ << std::endl;
+	std::cout << "At line: " << __LINE__ << std::endl;
+	std::cout << "\n\n";
+	exit(-1);
+} 
+
+void DebugPrint(const char* s, ...)
 {
 	#ifdef DEBUG_MODE
-		std::cout << "Debug Message: " << s << std::endl;
+		va_list args;
+		va_start(args, s);
+		while(*s != '\0')
+		{
+			if(*s=='%')
+			{
+				++s;
+				switch(*s)
+				{
+					case 'i':
+						std::cout << va_arg(args, int);
+					break;
+					case 'u':
+						std::cout << va_arg(args, unsigned int);
+					break;
+					case 'f':
+						std::cout << va_arg(args, double);
+					break;
+					case 's':
+						std::cout << std::string(va_arg(args, const char*));
+					break;
+					case 'p':
+						std::cout << va_arg(args, void*);
+					break;
+					default:
+					std::cout << "%?";
+					break;
+				}
+			}
+			else if(*s == '\n')
+			{
+				std::cout << std::endl;
+			}
+			else 
+			{
+				putchar(*s);
+			}
+			++s;
+		}
+
 	#endif
 }
 
-void DebugPrint(std::string s, int i)
-{
-	#ifdef DEBUG_MODE
-		std::cout << "Debug Message: " << s << "  " << i << std::endl;
-	#endif
-}
-
-void DebugPrint(std::string s, unsigned i)
-{
-	#ifdef DEBUG_MODE
-		std::cout << "Debug Message: " << s << "  " << i << std::endl;
-	#endif
-}
-
-void DebugPrint(std::string s, float f)
-{
-	#ifdef DEBUG_MODE
-		std::cout << "Debug Message: " << s << "  " << f << std::endl;
-	#endif
-}
-
-void DebugPrint(std::string s1, std::string s2)
-{
-	#ifdef DEBUG_MODE
-		std::cout << "Debug Message: " << s1 << "  " << s2 << std::endl;
-	#endif
-}
 
 void PrintOpenGLError()
 {
-	#ifdef DEBUG_MODE
-		int ret = glGetError();
-		if(ret)
-			std::cout << "OpenGL Error: " << ret << std::endl;
-		else
-			std::cout << "No OpenGL Error" << std::endl;
+	#ifdef PREVIEWER_OPENGL
+		#ifdef DEBUG_MODE
+			int ret = glGetError();
+			if(ret)
+				std::cout << "OpenGL Error: " << ret << std::endl;
+			else
+				std::cout << "No OpenGL Error" << std::endl;
+		#endif
 	#endif
 }

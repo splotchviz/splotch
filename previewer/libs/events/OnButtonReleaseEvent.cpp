@@ -30,7 +30,6 @@ namespace previewer
 	// Implement the constructor
 	OnButtonReleaseEvent::OnButtonReleaseEvent()
 	{
-		DebugPrint("OnButtonRelease Event Subscription");
 
 		if(!eventSubs)
 		{
@@ -44,7 +43,6 @@ namespace previewer
 	// Implement the destructor
 	OnButtonReleaseEvent::~OnButtonReleaseEvent()
 	{
-		DebugPrint("OnButtonRelease Event Unsubscription");
 
 		// Remove the subclass from the subscribers list
 		eventSubs->remove(dynamic_cast<OnButtonReleaseEvent*>(this));

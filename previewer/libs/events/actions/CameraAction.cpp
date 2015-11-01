@@ -9,8 +9,6 @@ namespace previewer
 	// destroyed)
 	CameraAction::~CameraAction()
 	{
-		DebugPrint("CameraAction Event Unsubscription");
-
 		// Remove subclass instance from the subscriber list
 		subscriberList->remove(dynamic_cast<CameraAction*>(this));
 	}
@@ -18,8 +16,6 @@ namespace previewer
 	// Subscribe the camera to the subscriber list
 	void CameraAction::CameraActionSubscribe()
 	{
-		DebugPrint("CameraAction Event Subscription");
-
 		if(!subscriberList)
 		{
 			subscriberList = new std::list<CameraAction*>();
@@ -32,8 +28,6 @@ namespace previewer
 	// Unsubscribe the camera from the subscriber list
 	void CameraAction::CameraActionUnsubscribe()
 	{
-		DebugPrint("CameraAction Event Unsubscription");
-
 		// Remove the subclass from the subscriber list
 		subscriberList->remove(dynamic_cast<CameraAction*>(this));
 	}
@@ -41,7 +35,6 @@ namespace previewer
 	// Call the subscriber list with a vector
 	void CameraAction::CallMoveCameraAction(vec3f newPosition, int type)
 	{
-		DebugPrint("MoveCameraAction Called");
 
 		for(std::list<CameraAction*>::iterator it = subscriberList->begin(); it!=subscriberList->end(); ++it)
 		{
@@ -54,7 +47,6 @@ namespace previewer
 	// Call the subscriber list with a vector
 	void CameraAction::CallGetCameraPosAction(vec3f& position)
 	{
-		DebugPrint("MoveCameraAction Called");
 
 		for(std::list<CameraAction*>::iterator it = subscriberList->begin(); it!=subscriberList->end(); ++it)
 		{
@@ -67,8 +59,6 @@ namespace previewer
 		// Call the subscriber list with a vector
 	void CameraAction::CallSetCameraLookAtAction(vec3f newLookat)
 	{
-		DebugPrint("SetCameraLookAtAction Called");
-
 		for(std::list<CameraAction*>::iterator it = subscriberList->begin(); it!=subscriberList->end(); ++it)
 		{
 			// Call the MoveCameraAction implementation of the sub class
@@ -80,7 +70,6 @@ namespace previewer
 	// Call the subscriber list with a vector
 	void CameraAction::CallGetCameraLookAtAction(vec3f& lookat)
 	{
-		DebugPrint("GetCameraLookatAction Called");
 
 		for(std::list<CameraAction*>::iterator it = subscriberList->begin(); it!=subscriberList->end(); ++it)
 		{
@@ -93,7 +82,6 @@ namespace previewer
 	// Call the subscriber list with a vector
 	void CameraAction::CallGetCameraUpAction(vec3f& newUpVector)
 	{
-		DebugPrint("GetCameraUpAction Called");
 
 		for(std::list<CameraAction*>::iterator it = subscriberList->begin(); it!=subscriberList->end(); ++it)
 		{

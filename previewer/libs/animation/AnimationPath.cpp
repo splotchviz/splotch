@@ -50,14 +50,14 @@ namespace previewer
 	{
 		DataPointList DPL;
 
-		DebugPrint("Created new DPL");
+		DebugPrint("Created new DPL\n");
 
 		// Check what type of interpolation we plan to do
 		// Interpolating other types is not yet supported...
 		switch(AnimationTypeLookUp::Query(component, parameter))
 		{
 			case FLOAT:
-				DebugPrint("Calling interpolate");
+				DebugPrint("Calling interpolate\n");
 				InterpolateF(DPL);
 				break;
 
@@ -78,7 +78,7 @@ namespace previewer
 				break;
 		}
 
-		DebugPrint("Storing");
+		DebugPrint("Storing\n");
 		InterpolatedDPList = DPL;
 	}
 
@@ -150,9 +150,9 @@ namespace previewer
 
 	void AnimationPath::InterpolateF(DataPointList& NewDPL)
 	{
-		DebugPrint("Max animation time:  ", AnimationData::GetMaxAnimationTime());
+		DebugPrint("Max animation time:  %f\n", AnimationData::GetMaxAnimationTime());
 
-		DebugPrint("Converting GDPL to FDPL");
+		DebugPrint("Converting GDPL to FDPL\n");
 		// Convert generic data point list to float data point list
 		DataPointListF DPLF;
 		DPLF.resize(DPList.size());
@@ -163,7 +163,7 @@ namespace previewer
 			DPLF[i].value = std::atof(DPList[i].value.c_str());
 		}
 
-		DebugPrint("Adding start point if necessary");
+		DebugPrint("Adding start point if necessary\n");
 		// If path starts partway through the animation, repeat first element at beginning of animation
 		if(DPLF.front().time > 0)
 		{
@@ -171,31 +171,31 @@ namespace previewer
 			DataPointF dp = DPLF.front();
 			dp.time = 0;
 			DPLF.insert(it, dp);
-			DebugPrint("It was necessary");
+			DebugPrint("It was necessary\n");
 		}
 
-		DebugPrint("Adding final point if necessary");
+		DebugPrint("Adding final point if necessary\n");
 		// If path ends before end of animation, repeat final point at end time
 		if(DPLF.back().time < AnimationData::GetMaxAnimationTime())
 		{
 			DataPointF dp = DPLF.back();
 			dp.time = AnimationData::GetMaxAnimationTime();
 			DPLF.push_back(dp);
-			DebugPrint("It was necessary");
+			DebugPrint("It was necessary\n");
 		}
 
 		DebugPrint("Getting total frames");
 		// Get total number of frames for animation 
 		totalFrames = AnimationData::GetMaxAnimationTime() * AnimationSimulation::GetFPS();
 
-		DebugPrint("Total Frames = ", totalFrames);
+		DebugPrint("Total Frames = %i\n", totalFrames);
 
 		//DebugPrint("DPLF size: ", DPLF.size());
 
 		// Do interpolation for point(n) and point (n+1), for all points up to size() - 1
 		for(int i = 0; i < (int)(DPLF.size() - 1); i++)
 		{
-			DebugPrint("Working out segment length");
+			DebugPrint("Working out segment length\n");
 			// Get length of segment (time between point[n] and point[n+1]) as percentage of total time
 			float segmentLength = abs(DPLF[i].time - DPLF[i+1].time);
 
@@ -203,22 +203,22 @@ namespace previewer
 			if(AnimationData::GetMaxAnimationTime() > 0 && segmentLength > 0)
 				percentageOfTotal = segmentLength / AnimationData::GetMaxAnimationTime();
 
-			DebugPrint("Working out fpseg");
+			DebugPrint("Working out fpseg\n");
 			// Work out number of frames allocated to segment
 			float framesPerSegment = 1;
 			if(percentageOfTotal > 0)
 				framesPerSegment = totalFrames * percentageOfTotal;
 
-			DebugPrint("Fpseg = ", framesPerSegment);
+			DebugPrint("Fpseg = %f\n", framesPerSegment);
 
-			DebugPrint("Working out increment");
+			DebugPrint("Working out increment\n");
 			// Compute increment value for mu (interpolation interval) 
 			// Ceiling fpseg for evenly spaced frames per segment at the expensive of having exact number of frames requested
 			float increment = 1/ceil(framesPerSegment);
 
-			DebugPrint("Increment = ", increment);
+			DebugPrint("Increment = %f\n", increment);
 
-			DebugPrint("Interpolating!");
+			DebugPrint("Interpolating!\n");
 			// Interpolate
 			switch(DPLF[i].interpType)
 			{
@@ -241,31 +241,31 @@ namespace previewer
 					std::cout << "invalid interpolation type given" << std::endl;
 					break;
 			}
-			DebugPrint("Finished Interpolating! I = ", i);
+			DebugPrint("Finished Interpolating! I = %i\n", i);
 		}
-		DebugPrint("DPLF size: ", (float)(DPLF.size()));
+		DebugPrint("DPLF size: %f\n", (float)(DPLF.size()));
 	}
 
 	void AnimationPath::LinearInterpolatePath(float& increment, int& iter, DataPointListF& DPLF, DataPointList& NewDPL)
 	{
 		float mu = 0;
 
-		DebugPrint("Increment = ", increment);
+		DebugPrint("Increment = %f\n", increment);
 
 		for(; mu < 1; mu += increment)
 		{
-			DebugPrint("Computing interpolation for mu = ", mu);
+			DebugPrint("Computing interpolation for mu = %f\n", mu);
 			float newValue = LinearInterpolate(mu, DPLF[iter].value, DPLF[iter+1].value);
-			DebugPrint("Value is: ", newValue);
+			DebugPrint("Value is: %d\n", newValue);
 
 
-			DebugPrint("Creating new data point");
+			DebugPrint("Creating new data point\n");
 			DataPoint dp;
 			dp.value = Utils::ToString(newValue);
 			dp.interpType = DPLF[iter].interpType;
 			dp.time = DPLF[iter].time;
 
-			DebugPrint("Pushing to new dpl");
+			DebugPrint("Pushing to new dpl\n");
 			NewDPL.push_back(dp);		
 		}
 	}

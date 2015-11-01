@@ -34,7 +34,11 @@ namespace previewer
 
 		#ifndef SPLOTCHMAC
 		char pathbuf[1024];
-		readlink("/proc/self/exe", pathbuf, 1024);
+		int err = readlink("/proc/self/exe", pathbuf, 1024);
+		if(err = -1)
+		{
+			planck_fail("Splotch (mac) readlink failed");
+		}
 		// Remove executable name from path
 		int len = 0;
 		exepath = std::string(pathbuf);
@@ -72,15 +76,10 @@ namespace previewer
 		
 		#endif
 
-
-		DebugPrint("Previewer Loaded with Parameter File");
-		DebugPrint("Parameter File:", paramFilePath);
+		DebugPrint("Previewer path: %s\n", exepath.c_str());
 
 		// Set application terminating flag
 		isApplicationTerminating = false;
-
-		// Go ahead and create local instance
-		DebugPrint("Previewer::Load has indicated parameter file does exist");
 
 		// Setup the parameter system
 		parameterInfo.Load(paramFilePath);
@@ -96,7 +95,6 @@ namespace previewer
 
 	void Previewer::Run()
 	{
-		//DebugPrint("Previewer Running");
 		WindowManager::UpdateFPS();
 
 		// Run each controller
@@ -109,21 +107,17 @@ namespace previewer
 
 	void Previewer::Unload()
 	{
-		DebugPrint("Previewer Unloading");
-
 		// Unload all the components
 		animationSim.Unload();
 		particleSim.Unload();
 		parameterInfo.Unload();
-
-		DebugPrint("Preview Unloaded");
 
 		return;
 	}
 
 	void Previewer::OnQuitApplication(Event)
 	{
-		DebugPrint("Terminating Application");
+		DebugPrint("Terminating Application\n");
 
 		isApplicationTerminating = true;
 	}
@@ -321,10 +315,21 @@ namespace previewer
 		param->setParam<double>("camera_y",camPos.y);
 		param->setParam<double>("camera_z",camPos.z);
 		// Use campos - lookat as our lookat is normalised camera-relative coords 
-		// and splotch expects non-normalised world-relative coords. 
-		param->setParam<double>("lookat_x",(camPos.x - camLookAt.x));
-		param->setParam<double>("lookat_y",(camPos.y - camLookAt.y));
-		param->setParam<double>("lookat_z",(camPos.z - camLookAt.z));
+		// and splotch expects non-normalised world-relative coords.
+
+		// std::cout << "up.x: " << camUp.x << std::endl;
+		// std::cout << "up.y: " << camUp.y << std::endl;
+		// std::cout << "up.z: " << camUp.z << std::endl;
+		// std::cout << "at.x: " << camLookAt.x << std::endl;
+		// std::cout << "at.y: " << camLookAt.y << std::endl;
+		// std::cout << "at.z: " << camLookAt.z << std::endl;
+		// std::cout << "position.x: " << camPos.x << std::endl;
+		// std::cout << "position.y: " << camPos.y << std::endl;
+		// std::cout << "position.z: " << camPos.z << std::endl;
+
+		param->setParam<double>("lookat_x",(camPos.x + camLookAt.x));
+		param->setParam<double>("lookat_y",(camPos.y + camLookAt.y));
+		param->setParam<double>("lookat_z",(camPos.z + camLookAt.z));
 		// Invert sky vector as previewer and splotch camera setups are slightly different
 		param->setParam<double>("sky_x",(camUp.x * -1));
 		param->setParam<double>("sky_y",(camUp.y * -1));
@@ -345,9 +350,9 @@ namespace previewer
 		animationSim.WriteSplotchAnimFile(outpath);
 	}
 
-	void Previewer::ReloadColourData()
+	void Previewer::ReloadColorData()
 	{
-		particleSim.ReloadColourData();
+		particleSim.ReloadColorData();
 	}
 
 	void Previewer::SetPalette(std::string paletteFilename, int particleType)
@@ -483,9 +488,25 @@ namespace previewer
 		return param->find<std::string>(name);		
 	}
 
+	std::string Previewer::GetParameter(std::string name, std::string dflt)
+	{
+		paramfile* param = parameterInfo.GetParamFileReference();
+		return param->find<std::string>(name, dflt);			
+	}
+
 	void Previewer::ResetCamera()
 	{
 		particleSim.ResetCamera();
+	}
+
+	void Previewer::SetTarget(vec3f t)
+	{
+		particleSim.SetTarget(t);
+	}
+
+	void Previewer::SetTargetCenter()
+	{
+		particleSim.SetTargetCenter();
 	}
 
 }

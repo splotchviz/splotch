@@ -29,7 +29,6 @@ namespace previewer
 	// Implement the constructor
 	OnButtonPressEvent::OnButtonPressEvent()
 	{
-		DebugPrint("OnButtonPress Event Subscription");
 
 		if(!eventSubs)
 		{
@@ -43,8 +42,6 @@ namespace previewer
 	// Implement the destructor
 	OnButtonPressEvent::~OnButtonPressEvent()
 	{
-		DebugPrint("OnButtonPress Event Unsubscription");
-
 		// Remove the subclass from the subscribers list
 		eventSubs->remove(dynamic_cast<OnButtonPressEvent*>(this));
 	}
@@ -52,8 +49,6 @@ namespace previewer
 	// Implement the Caller
 	void OnButtonPressEvent::CallEvent(Event ev)
 	{
-		//DebugPrint("OnButtonPress Event Call");
- 
 		if(eventSubs)
 		{
 			for(std::list<OnButtonPressEvent*>::iterator it = eventSubs->begin(); it!= eventSubs->end(); ++it)

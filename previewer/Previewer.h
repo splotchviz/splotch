@@ -22,7 +22,7 @@
 #ifndef SPLOTCH_PREVIEWER_PREVIEWER
 #define SPLOTCH_PREVIEWER_PREVIEWER
 
-// Event includes
+// Previewer includes
 #include "libs/events/OnButtonPressEvent.h"
 #include "libs/events/OnButtonReleaseEvent.h"
 #include "libs/events/OnExposedEvent.h"
@@ -31,18 +31,18 @@
 #include "libs/events/OnMotionEvent.h"
 #include "libs/events/OnQuitApplicationEvent.h"
 #include "libs/core/Event.h"
-
-// Member includes
 #include "libs/core/Parameter.h"
 #include "libs/core/ParticleSimulation.h"
 #include "libs/animation/AnimationSimulation.h"
-#include "cxxsupport/vec3.h"
-
-// Usage includes
 #include "libs/core/WindowManager.h"
 #include "libs/core/Camera.h"
-#include "cxxsupport/paramfile.h"
 
+// Splotch includes
+#include "cxxsupport/vec3.h"
+#include "cxxsupport/paramfile.h"
+#include "cxxsupport/error_handling.h"
+
+// Std includes
 #include <string>
 #include <stdlib.h>
 #include <errno.h>
@@ -103,7 +103,7 @@ namespace previewer
 		void WriteParameterFile(std::string outpath);
 		void WriteSplotchAnimationFile(std::string outpath);
 		
-		void ReloadColourData();
+		void ReloadColorData();
 		void SetPalette(std::string paletteFilename, int particleType);
 		std::string GetPalette(int particleType);
 		void Interpolate();
@@ -123,8 +123,11 @@ namespace previewer
 		// Note this getParameter function is only useful for displaying parameters. 
 		// They are not converted to their original format, they are kept as string
 		std::string GetParameter(std::string);
+		std::string GetParameter(std::string name, std::string dflt);
 
 		void ResetCamera();
+		void SetTarget(vec3f t);
+		void SetTargetCenter();
 
 		static Parameter parameterInfo;
 

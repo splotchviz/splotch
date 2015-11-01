@@ -25,7 +25,7 @@
 //Debug include
 #include "previewer/libs/core/Debug.h"
 
-#include "../../../cxxsupport/paramfile.h"
+#include "cxxsupport/paramfile.h"
 #include <string>
 #include <map>
 #include <iostream>

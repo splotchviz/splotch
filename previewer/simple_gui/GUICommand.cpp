@@ -29,45 +29,56 @@ namespace previewer
 		GUICommand::GUICommand()
 		{
 			isTerminating = false;
+			currentCommandLine = "";
+			// Add commands here
+			// syntax: command string, command function*, num args
+			// -1 means variable arg count
 
-			// Set up confirmation list
-			confirmationsList.push_back("PARAMETER FILE WRITTEN TO");
-			confirmationsList.push_back("PALETTE PARAM SET");
-			confirmationsList.push_back("COLORS RELOADED");
-			confirmationsList.push_back("FPS");
-			confirmationsList.push_back("ANIMATION POINT SAVED AT");
-			confirmationsList.push_back("LAST ANIMATION POINT REMOVED");
-			confirmationsList.push_back("MOVEMENT SPEED SET TO");
-			confirmationsList.push_back("ROTATION SPEED SET TO");
-			confirmationsList.push_back("ANIMATION PREVIEW IN PROGRESS");
-			confirmationsList.push_back("ANIMATION FILE SAVED TO");
-			confirmationsList.push_back("ANIMATION FILE LOADED FROM");
-			confirmationsList.push_back("X RESOLUTION SET TO");
-			confirmationsList.push_back("Y RESOLUTION SET TO");
-			confirmationsList.push_back("RESOLUTION SET TO");
-			confirmationsList.push_back("FIELD OF VIEW SET TO");
-			confirmationsList.push_back("INTERPOLATED - CHECK CLI FOR MORE DETAILS");
-			confirmationsList.push_back("WRITTEN ANIMATION FILE - CHECK CLI FOR MORE DETAILS");
-			confirmationsList.push_back("CAMERA INTERPOLATION TYPE SET TO");
-			confirmationsList.push_back("LOOKAT INTERPOLATION TYPE SET TO");
-			confirmationsList.push_back("PROGRAM RUNNING, CHECK CLI FOR MORE DETAILS");
-			confirmationsList.push_back("VIEWING IMAGE, TYPE STOP VIEWING TO RETURN TO PREVIEW");
-			confirmationsList.push_back("VIEWING STOPPED");
-			confirmationsList.push_back("PARAMETER SET");	
-			confirmationsList.push_back("BRIGHTNESS SET");
-			confirmationsList.push_back("BRIGHTNESS FOR TYPE");
-			confirmationsList.push_back("SMOOTHING SET");
-			confirmationsList.push_back("SMOOTHING FOR TYPE");
+			// Register previewer commands
+			// Generic
+			AddCommand("quit",&GUICommand::Quit, 0);
+			AddCommand("run",&GUICommand::Run, 1);
+			AddCommand("view",&GUICommand::View, 1);
+			AddCommand("stop",&GUICommand::Stop, 0);
+
+			// Interface
+			AddCommand("get fps", &GUICommand::GetFPS, 0);
+			AddCommand("set move speed", &GUICommand::SetMoveSpeed, 1);
+			AddCommand("set rotate speed", &GUICommand::SetRotateSpeed, 1);
+			AddCommand("set xres", &GUICommand::SetXRes, 1);
+			AddCommand("set yres", &GUICommand::SetYRes, 1);
+			AddCommand("set res", &GUICommand::SetRes, 2);
+			AddCommand("set fov", &GUICommand::SetFOV, 1);
+			AddCommand("set target",&GUICommand::SetTarget, -1);
+			AddCommand("reset camera",&GUICommand::ResetCamera, 0);
+
+			// Splotch 
+			AddCommand("write params", &GUICommand::WriteParams, 1);
+			AddCommand("write scenefile", &GUICommand::WriteSceneFile, 1);
+			AddCommand("set param", &GUICommand::SetParam, 2);
+			AddCommand("get param", &GUICommand::GetParam, 1);
+
+			// Scene manipulation
+			AddCommand("set palette", &GUICommand::SetPalette, 2);
+			AddCommand("reload colors", &GUICommand::ReloadColors, 0);
+			AddCommand("set brightness", &GUICommand::SetBrightness, 2);
+			AddCommand("get brightness", &GUICommand::GetBrightness, 1);
+			AddCommand("set smoothing", &GUICommand::SetSmoothing, 2);
+			AddCommand("get smoothing", &GUICommand::SetSmoothing, 1);			
+
+
+			// Animation
+			AddCommand("set point", &GUICommand::SetAnimPoint, 1);
+			AddCommand("remove point", &GUICommand::RemoveAnimPoint, 0);
+			AddCommand("preview", &GUICommand::PreviewAnim, 0);
+			AddCommand("save animation", &GUICommand::SaveAnimFile, 1);
+			AddCommand("load animation", &GUICommand::LoadAnimFile, 1);
+			AddCommand("set camera interpolation", &GUICommand::SetCamInterpolation, 1);
+			AddCommand("set lookat interpolation", &GUICommand::SetLookatInterpolation, 1);
+
 		}
 
-		void GUICommand::Undo()
-		{
-			//
-		}
-		void GUICommand::Redo()
-		{
-			//
-		}
+		// AddCommand()
 
 		std::string GUICommand::GetCurrentCommandLine()
 		{
@@ -95,6 +106,10 @@ namespace previewer
 				{
 					currentCommandLine += " ";
 				}
+				else if(ev.keyID == "UP")
+				{
+					// Get previous command and display in command line
+				}				
 				else
 				{
 					if(ev.keyID.length() == 1)
@@ -103,364 +118,545 @@ namespace previewer
 			}
 		}
 
+		void GUICommand::AddCommand(std::string inStr,void (GUICommand::*func)(Previewer& pv, std::vector<std::string> args), int nArgs)
+		{
+			Command cmd;
+			cmd.cmdTokens = Tokenize(inStr);
+			cmd.func = func;
+			cmd.nArgs = nArgs;
+			commandList.push_back(cmd);
+		}
+
 		void GUICommand::ProcessCommand(Previewer& pv)
 		{
-			std::string command;
-			command = currentCommandLine;
-			std::transform(command.begin(), command.end(), command.begin(), ::toupper);
 
-			// Quit Event
-			if(DoesStringBegin(command, "QUIT"))
+			// Tokenize current command on commandline
+			std::vector<std::string> tokens = Tokenize(currentCommandLine);
+
+			// Parse for relevant command
+			//DebugPrint("CommandList.size(): %u\n",commandList.size());
+			//fflush(0);
+
+			//for(unsigned i = 0; i < tokens.size(); i++)
+			//{
+			//	DebugPrint("token %i: %s\n", i, tokens[i].c_str());
+			//}
+
+			if(tokens.size())
 			{
-				// Quit application
-				currentCommandLine.clear();
-				isTerminating = true;
-				pv.TriggerOnQuitApplicationEvent();
-			}
+				Command cmd = Parse(tokens);
 
-			// Write Parameter File
-			if(DoesStringBegin(command, "WRITE PARAMS"))
-			{
-				if(GetArgFromString(currentCommandLine, 3) != "ARG_NOT_FOUND")
-				{
-					// Writing parameter file
-					pv.WriteParameterFile(GetArgFromString(currentCommandLine, 3));
-					currentCommandLine = "Parameter file written to " + GetArgFromString(currentCommandLine, 3);
-				}
-			}
-
-			// Set Palette
-			if(DoesStringBegin(command, "SET PALETTE"))
-			{
-				// Chaging the palette
-				pv.SetPalette(GetArgFromString(currentCommandLine, 4), atoi(GetArgFromString(currentCommandLine, 3).c_str()));
-				currentCommandLine = "Palette param set for particle type " + GetArgFromString(currentCommandLine, 3);
-			}
-
-			// Reload Colours
-			if(DoesStringBegin(command, "RELOAD COLORS"))
-			{
-				// Reloading the colour data
-				pv.ReloadColourData();
-				currentCommandLine = "Colors reloaded";
-			}
-
-			// Get FPS
-			if(DoesStringBegin(command, "GET FPS"))
-			{	
-				std::stringstream sstream;
-				sstream << pv.GetFPS();
-				std::string str;
-				sstream >> str;
-				// Output the fps
-				currentCommandLine = "FPS " + str;
-			}
-
-			// Set Animation Point
-			if(DoesStringBegin(command, "SET POINT"))
-			{
-				pv.SetAnimationPoint(atoi(GetArgFromString(currentCommandLine, 3).c_str()));
-				pv.UnloadAnimationFile();
-				currentCommandLine = "Animation point saved at time: " + GetArgFromString(currentCommandLine, 3);
-			}
-
-			// Remove Animation Point
-			if(DoesStringBegin(command, "REMOVE POINT"))
-			{
-				pv.RemoveAnimationPoint();
-				currentCommandLine = "Last animation point removed";
-			}
-
-			// Set Movement Speed
-			if(DoesStringBegin(command, "SET MOVE SPEED"))
-			{
-				pv.SetMovementSpeed(atoi(GetArgFromString(currentCommandLine, 4).c_str()));
-				currentCommandLine = "Movement speed set to " + GetArgFromString(currentCommandLine, 4);
-			}
-
-			// Set Rotation Speed
-			if(DoesStringBegin(command, "SET ROTATE SPEED"))
-			{
-				pv.SetRotationSpeed(atoi(GetArgFromString(currentCommandLine, 4).c_str()));
-				currentCommandLine = "Rotation speed set to " + GetArgFromString(currentCommandLine, 4);
-			}
-
-			// Preview Animation
-			if(DoesStringBegin(command, "PREVIEW"))
-			{
-				//pv.UnloadAnimationFile();
-				pv.Interpolate();
-				pv.PreviewAnimation();
-				currentCommandLine = "Animation preview in progress";
-			}
-
-			// Save animation file 
-			if(DoesStringBegin(command, "SAVE ANIMATION"))
-			{
-				pv.Interpolate();
-				pv.SaveAnimationFile(GetArgFromString(currentCommandLine, 3));
-				currentCommandLine = "Animation file saved to " + GetArgFromString(currentCommandLine, 3);
-			}
-
-			// Load animation file
-			if(DoesStringBegin(command, "LOAD ANIMATION"))
-			{
-				pv.LoadAnimationFile(GetArgFromString(currentCommandLine, 3));
-				currentCommandLine = "Animation file loaded from " + GetArgFromString(currentCommandLine, 3);
-			}
-
-			// Set X Resolution
-			if(DoesStringBegin(command, "SET XRES"))
-			{
-				pv.SetXRes(atoi(GetArgFromString(currentCommandLine, 3).c_str()));
-				currentCommandLine = "X resolution set to " + GetArgFromString(currentCommandLine, 3);
-			}
-
-			// Set Y Resolution
-			if(DoesStringBegin(command, "SET YRES"))
-			{
-				pv.SetYRes(atoi(GetArgFromString(currentCommandLine, 3).c_str()));
-				currentCommandLine = "Y resolution set to " + GetArgFromString(currentCommandLine, 3);
-			}
-
-			// Set Resolution
-			if(DoesStringBegin(command, "SET RES"))
-			{
-				pv.SetXRes(atoi(GetArgFromString(currentCommandLine, 3).c_str()));
-				pv.SetYRes(atoi(GetArgFromString(currentCommandLine, 4).c_str()));
-				currentCommandLine = "Resolution set to X:" + GetArgFromString(currentCommandLine, 3) + " Y:" + GetArgFromString(currentCommandLine, 4);
-			}
-
-			// Field of view
-			if(DoesStringBegin(command, "SET FOV"))
-			{
-				pv.SetFOV(atoi(GetArgFromString(currentCommandLine, 3).c_str()));
-				currentCommandLine = "Field of view set to " + GetArgFromString(currentCommandLine, 3);
-			}
-
-			// Field of view
-			if(DoesStringBegin(command, "INTERPOLATE"))
-			{
-				pv.Interpolate();
-				currentCommandLine = "Interpolated - check cli for more details";
-			}
-
-			// Write splotch "scene file"
-			if(DoesStringBegin(command, "WRITE SCENEFILE"))
-			{
-				pv.Interpolate();
-				pv.WriteSplotchAnimationFile(GetArgFromString(currentCommandLine, 3));
-				currentCommandLine = "Written animation file - check cli for more details";
-			}
-
-			// Allow you to set camera interpolation type			
-			if(DoesStringBegin(command, "SET CAMERA INTERPOLATION"))
-			{
-				if(GetArgFromString(currentCommandLine, 4) == "linear")
-				{
-					pv.SetCameraInterpolation(LINEAR);
-					currentCommandLine = "Camera interpolation type set to: LINEAR";
-				}
-				else if(GetArgFromString(currentCommandLine, 4) == "cubic")
-				{
-					pv.SetCameraInterpolation(CUBIC);
-					currentCommandLine = "Camera interpolation type set to: CUBIC";
-				}
-				else 
-				{
-					currentCommandLine = "Camera interpolation type unrecognised (linear or cubic)";
-				}
-
-			}
-
-			// Allow you to set lookat interpolation type
-			if(DoesStringBegin(command, "SET LOOKAT INTERPOLATION"))
-			{
-				if(GetArgFromString(currentCommandLine, 4) == "linear")
-				{
-					pv.SetLookatInterpolation(LINEAR);
-					currentCommandLine = "Lookat interpolation type set to: LINEAR";
-				}
-				else if(GetArgFromString(currentCommandLine, 4) == "cubic")
-				{
-					pv.SetLookatInterpolation(CUBIC);
-					currentCommandLine = "Lookat interpolation type set to: CUBIC";
-				}
-				else 
-				{
-					currentCommandLine = "Lookat interpolation type unrecognised (linear or cubic)";
-				}
-
-			}
-
-			// Pipe command to command line
-			if(DoesStringBegin(command, "RUN"))
-			{
-				int i = 2;
-				std::string arg;
-
-				while(GetArgFromString(currentCommandLine, i) != "ARG_NOT_FOUND")
-					arg+=GetArgFromString(currentCommandLine, i)+" ";
-
-				system(arg.c_str());
-				currentCommandLine = "Command sent to system, check cli for details";
-			}
-
-			// View splotch image
-			if(DoesStringBegin(command, "VIEW"))
-			{
-				pv.ViewImage(GetArgFromString(currentCommandLine, 2));
-				currentCommandLine = "Viewing image, type stop to return to preview";
-			}
-
-			// Stop viewing splotch image
-			if(DoesStringBegin(command, "STOP"))
-			{
-				pv.StopViewingImage();
-				currentCommandLine = "Viewing stopped";
-			}
-
-			// Set previewing brightness
-			if(DoesStringBegin(command, "SET BRIGHTNESS"))
-			{
-				std::string type = GetArgFromString(currentCommandLine, 3);
-				pv.SetRenderBrightness(atoi(type.c_str()), (float)atof(GetArgFromString(currentCommandLine, 4).c_str()));
-				currentCommandLine = "Brightness set for type "+type;
-			}
-
-			// Set previewing brightness
-			if(DoesStringBegin(command, "GET BRIGHTNESS"))
-			{
-				int b = atoi(GetArgFromString(currentCommandLine, 3).c_str());
-				std::stringstream sstream;
-				sstream << pv.GetRenderBrightness(b);
-				std::string str;
-				sstream >> str;
-				currentCommandLine = "Brightness for type "+GetArgFromString(currentCommandLine, 3)+": "+str;
-			}
-
-			if(DoesStringBegin(command, "SET SMOOTHING"))
-			{
-				std::string type = GetArgFromString(currentCommandLine, 3);
-				pv.SetSmoothingLength(atoi(type.c_str()), (float)atof(GetArgFromString(currentCommandLine, 4).c_str()));
-				currentCommandLine = "Smoothing set for type "+type;
-			}
-
-			// Set previewing brightness
-			if(DoesStringBegin(command, "GET SMOOTHING"))
-			{
-				int b = atoi(GetArgFromString(currentCommandLine, 3).c_str());
-				std::stringstream sstream;
-				sstream << pv.GetSmoothingLength(b);
-				std::string str;
-				sstream >> str;
-				currentCommandLine = "Smoothing for type "+GetArgFromString(currentCommandLine, 3)+": "+str;
-			}
-
-			// Set other parameters not already settable
-			if(DoesStringBegin(command, "SET PARAM"))
-			{
-				pv.SetParameter(GetArgFromString(currentCommandLine, 3), GetArgFromString(currentCommandLine, 4));
-				currentCommandLine = "Parameter set";
-			}		
-
-			// Get other parameters not already gettable
-			if(DoesStringBegin(command, "GET PARAM"))
-			{
-				std::string param = pv.GetParameter(GetArgFromString(currentCommandLine, 3));
-				currentCommandLine = GetArgFromString(currentCommandLine, 3)+" = "+param;
-				std::string confirm = GetArgFromString(currentCommandLine, 3)+" = "+param;
-				std::transform(confirm.begin(), confirm.end(), confirm.begin(), ::toupper);
-				confirmationsList.push_back(confirm);	
-			}
-		
-			// Get other parameters not already gettable
-			if(DoesStringBegin(command, "RESET CAM"))
-			{
-				pv.ResetCamera();
-				currentCommandLine = "Camera reset";
-			}
-
-			// Handle response messages
-			for(std::list<std::string>::iterator it = confirmationsList.begin(); it != confirmationsList.end(); it++)
-			{
-				if(DoesStringBegin(command, *it))
-				{
-					currentCommandLine.clear();
-				}
+				// Call appropriate function (as defined during AddCommand())
+				// SHOULD CHECK nArgs! and allow for -1 for variable arg count
+				current_func = (cmd.func);
+				(this->*current_func)(pv, cmd.argTokens);
 			}
 		}
 
-		//void GUICommand::ProcessReverseCommand(std::string command)
-		//{
-			// Undo command feature not written yet
-		//}
-
-		bool GUICommand::IsTerminating()
+		std::vector<std::string> GUICommand::Tokenize(std::string input)
 		{
-			return isTerminating;
-		}
+			// Tokenize a string into a string vector
+			bool protectedMode = false; 
+			std::string token;
+			std::vector<std::string> tokenList;
 
-		std::string GUICommand::GetArgFromString(std::string str, int arg)
-		{
-			bool protectedMode = false; // not in " protected mode
-			int currentArg = 1; // analysing first argument
-			std::string currentArgStr;
-
-			for(std::string::iterator it = str.begin(); it != str.end(); it++)
+			for(std::string::iterator it = input.begin(); it != input.end(); it++)
 			{
 				// Test for space
 				if(*it == ' ')
 				{
 					if(protectedMode)
 					{
-						// Ignore the space
-						currentArgStr += *it;
+						token += *it;
 					}
-					else
+					else if(token.size() > 0)
 					{
-						// End of argument
-						if(currentArg == arg)
-						{
-							return currentArgStr;
-						}
-						else
-						{
-							currentArg++;
-							currentArgStr.clear();
-						}
+						// if not protected then transform to lowercase
+						if(token[token.size()-1] != '"')
+							std::transform(token.begin(), token.end(),token.begin(), static_cast<int(*)(int)>(std::tolower));
+						tokenList.push_back(token);
+						token = "";
 					}
 				}
-
-				// Test for protected mode character
+				// Test for escape character
 				else if( *it == '"')
 				{
-					if(protectedMode)
-						protectedMode = false;
-					else
-						protectedMode = true;
+					protectedMode = !protectedMode;
 				}
-
 				// Any other character
 				else
 				{
-					currentArgStr += *it;
+					token += *it;
 				}
 			}
+			if(token.size() > 0)
+				tokenList.push_back(token);
+			
+			return tokenList;
+		}
 
-			if(currentArg != arg)
+		Command GUICommand::Parse(std::vector<std::string> tokens)
+		{
+			// DebugPrint("tokens.size(): %u\n",tokens.size());
+			// for(unsigned i = 0; i < tokens.size(); i++)
+			// {
+			// 	DebugPrint("Token %i: %s\n", i, tokens[i].c_str());
+			// }
+			Command cmd;
+
+			// If there are tokens on the command line
+			if(tokens.size() > 0)
 			{
-				return std::string("ARG_NOT_FOUND");
+				// For each command, compare tokens iteratively until we find a full match
+				for(unsigned i = 0; i < commandList.size(); i++)
+				{
+					unsigned j = 0;
+					// While current token matches command token
+					while(tokens[j] == commandList[i].cmdTokens[j])
+					{
+						// Check if we are on final token of command
+						if(j == commandList[i].cmdTokens.size()-1)
+						{
+							// We've found a matching command, now give it the arguments and return
+							// First clear the arguments list from previous invocations of command
+							commandList[i].argTokens.clear();
+							for(j++; j < tokens.size(); j++)
+								commandList[i].argTokens.push_back(tokens[j]);
+							// Clear text from the command line and return command
+							currentCommandLine.clear();
+							return commandList[i];
+						}
+						else 
+							j++;
+					}
+
+				}
 			}
 			else
 			{
-				return currentArgStr;
+				cmd.func = &GUICommand::ClearCommand;
+				return cmd;
+			}
+			// If we get here, we havent found a match
+			// Check if this command was already an 'error', 'not found', or 'output' command
+			// Just clear screen if so
+			if(tokens.size() > 0)
+			{
+				if(tokens[0] == std::string("error:") ||
+				   tokens[0] == std::string("command_not_found:") ||
+				   tokens[0] == std::string("output:")	)
+				{
+					cmd.func = &GUICommand::ClearCommand;
+					return cmd;
+				}	
+			}
+
+			// If its a new command then create and return not found command 
+			cmd.argTokens.resize(tokens.size()+1);
+			cmd.argTokens[0] = "command_not_found:";
+			for(unsigned i = 0; i < tokens.size(); i++)
+				cmd.argTokens[i+1] = tokens[i];
+			cmd.func = &GUICommand::CommandNotFound;
+
+			return cmd;
+		}
+
+		bool GUICommand::IsTerminating()
+		{
+			return isTerminating;
+		}
+
+		//--------------------------------------------------------------------------------
+		//  Command functions
+		//--------------------------------------------------------------------------------
+
+		// Internal
+		void GUICommand::ClearCommand(Previewer& pv, std::vector<std::string> args)
+		{
+			currentCommandLine.clear();
+		}
+
+		void GUICommand::CommandNotFound(Previewer& pv, std::vector<std::string> args)
+		{
+			currentCommandLine.clear();
+			for(unsigned i = 0; i < args.size(); i++)
+				currentCommandLine += args[i]+" ";				
+		}
+
+		//--------------------------------------------------------------------------------
+		// Generic
+		void GUICommand::Quit(Previewer& pv, std::vector<std::string> args)
+		{
+				//currentCommandLine.clear();
+				isTerminating = true;
+				pv.TriggerOnQuitApplicationEvent();			
+		}
+
+		// Pipe to command line
+		void GUICommand::Run(Previewer& pv, std::vector<std::string> args)
+		{
+			if(args.size() != 1)
+				currentCommandLine = "error: run takes 1 argument (use quotes eg run \"./exe optional arguments\"";
+			else
+			{
+				std::string cmd;
+
+				for(int i = 0; i < args.size(); i++)
+					cmd+=args[i]+" ";
+
+				system(cmd.c_str());
+				currentCommandLine = "output: command sent to system, check parent cli for details";
 			}
 		}
 
-		bool GUICommand::DoesStringBegin(std::string str1, std::string str2)
+		// View tga image
+		void GUICommand::View(Previewer& pv, std::vector<std::string> args)
 		{
-			return (str1.compare(0, str2.length(), str2) == 0) ? true : false;
+			if(args.size() != 1)
+				currentCommandLine = "error: view takes 1 string argument";
+			else
+			{
+				pv.ViewImage(args[0]);
+				currentCommandLine = "output: viewing image, use stop command to return to preview";
+			}
+
 		}
+
+		// Stop viewing image
+		void GUICommand::GUICommand::Stop(Previewer& pv, std::vector<std::string> args)
+		{
+			pv.StopViewingImage();
+		}
+
+		//--------------------------------------------------------------------------------
+		// Interface
+		void GUICommand::GetFPS(Previewer& pv, std::vector<std::string> args)
+		{
+			if(args.size() != 0)
+				currentCommandLine = "error: get fps takes 0 arguments";
+			else
+			{
+				std::stringstream sstream;
+				sstream << pv.GetFPS();
+				std::string str;
+				sstream >> str;
+				currentCommandLine = "output: FPS " + str;
+			}
+		}
+
+		void GUICommand::SetMoveSpeed(Previewer& pv, std::vector<std::string> args)
+		{
+			if(args.size() != 1)
+				currentCommandLine = "error: set move speed takes 1 int argument";
+			else
+			{
+				pv.SetMovementSpeed(atoi(args[0].c_str()));
+				currentCommandLine = "output: Movement speed set to " + args[0];
+			}			
+
+		}	
+
+		void GUICommand::SetRotateSpeed(Previewer& pv, std::vector<std::string> args)
+		{
+			if(args.size() != 1)
+				currentCommandLine = "error: set rotate speed takes 1 int argument";
+			else
+			{
+				pv.SetRotationSpeed(atoi(args[0].c_str()));
+				currentCommandLine = "output: Rotate speed set to " + args[0];
+			}
+		}	
+
+		void GUICommand::SetXRes(Previewer& pv, std::vector<std::string> args)
+		{
+			if(args.size() != 1)
+				currentCommandLine = "error: set xres takes 1 int argument";
+			else
+			{
+				pv.SetXRes(atoi(args[0].c_str()));
+			}
+		}
+
+		void GUICommand::SetYRes(Previewer& pv, std::vector<std::string> args)
+		{
+			if(args.size() != 1)
+				currentCommandLine = "error: set yres  takes 1 int argument";
+			else
+			{
+				pv.SetYRes(atoi(args[0].c_str()));
+			}
+		}
+
+		void GUICommand::SetRes(Previewer& pv, std::vector<std::string> args)
+		{
+			if(args.size() != 2)
+				currentCommandLine = "error: set res takes 2 int arguments";
+			else
+			{
+				pv.SetXRes(atoi(args[0].c_str()));
+				pv.SetYRes(atoi(args[1].c_str()));	
+			}
+		}
+
+		void GUICommand::SetFOV(Previewer& pv, std::vector<std::string> args)
+		{
+			if(args.size() != 1)
+				currentCommandLine = "error: set yres  takes 1 int argument";
+			else
+			{
+				pv.SetFOV(atoi(args[0].c_str()));
+			}			
+		}
+
+		void GUICommand::SetTarget(Previewer& pv, std::vector<std::string> args)
+		{
+			if(args.size() == 0)
+			{
+				pv.SetTargetCenter();
+			}
+			else if(args.size() == 3)
+			{
+			 	pv.SetTarget(vec3f(atof(args[0].c_str()),atof(args[1].c_str()),atof(args[2].c_str())));				
+			}
+			else
+			{
+				currentCommandLine = "error: set target takes 0 args for center or 3 float args for vector position";
+			}	
+		}
+
+		void GUICommand::ResetCamera(Previewer& pv, std::vector<std::string> args)
+		{
+			if(args.size() != 0)
+				currentCommandLine = "error: reset camera takes 0 arguments";
+			else
+			{
+				pv.ResetCamera();				
+			}
+		}
+
+		//--------------------------------------------------------------------------------
+		// Splotch 
+		void GUICommand::WriteParams(Previewer& pv, std::vector<std::string> args)
+		{
+			//DebugPrint("Args.size(): %i", args.size());
+			if(args.size() != 1)
+				currentCommandLine = "error: write params takes 1 string argument";
+			else
+			{
+				pv.WriteParameterFile(args[0]);				
+			}
+	
+		}
+
+		void GUICommand::WriteSceneFile(Previewer& pv, std::vector<std::string> args)
+		{
+			if(args.size() != 1)
+				currentCommandLine = "error: write scenefile takes 1 string argument";
+			else
+			{
+			 	pv.Interpolate();
+			 	pv.WriteSplotchAnimationFile(args[0]);			
+			}			
+		}
+
+		void GUICommand::SetParam(Previewer& pv, std::vector<std::string> args)
+		{
+			if(args.size() != 1)
+				currentCommandLine = "error: set param takes 2 argument, parametername(string) and value(string)";
+			else
+			{
+				pv.SetParameter(args[0], args[1]);
+			}
+		}	
+
+		void GUICommand::GetParam(Previewer& pv, std::vector<std::string> args)
+		{
+			if(args.size() != 1)
+				currentCommandLine = "error: get param takes 1 argument, parametername(string)";
+			else
+			{
+				std::string param = pv.GetParameter(args[0]);
+				currentCommandLine = args[0]+"="+param;
+			}
+		}
+		//--------------------------------------------------------------------------------
+		// Scene manipulation
+		void GUICommand::SetPalette(Previewer& pv, std::vector<std::string> args)
+		{
+			if(args.size() != 2)
+				currentCommandLine = "error: set palette takes 2 arguments: integer particle type, palette file";
+			else
+			{
+				int ptype = atoi(args[0].c_str());
+				if(ptype<0 || ptype > MAX_SPECIES)
+				{
+					currentCommandLine = "error: invalid particle type: " + args[0];				
+				}
+				else if(!FileLib::FileExists(args[1].c_str()))
+				{
+					currentCommandLine = "error: file not found: " + args[1];
+				}
+				else
+				{
+					pv.SetPalette(args[1], ptype);
+				}					
+			}
+		}
+	
+		void GUICommand::ReloadColors(Previewer& pv, std::vector<std::string> args)
+		{
+			if(args.size() != 0)
+				currentCommandLine = "error: reload colors takes 0 arguments";
+			else
+			{
+				pv.ReloadColorData();	
+			}
+		}
+
+		void GUICommand::SetBrightness(Previewer& pv, std::vector<std::string> args)
+		{
+			if(args.size() != 2)
+				currentCommandLine = "error: set brightness takes 2 arguments, type(int) float(value)";
+			else
+			{
+				pv.SetRenderBrightness(atoi(args[0].c_str()), (float)atof(args[1].c_str()));
+			}
+		}
+
+		void GUICommand::GetBrightness(Previewer& pv, std::vector<std::string> args)
+		{
+			if(args.size() != 1)
+				currentCommandLine = "error: get brightness takes 1 argument, type(int)";
+			else
+			{
+				float b = pv.GetRenderBrightness(atoi(args[0].c_str()));
+				currentCommandLine = "output: brightness for type "+args[0]+": "+toa(b);	
+			}
+		}	
+
+		void GUICommand::SetSmoothing(Previewer& pv, std::vector<std::string> args)
+		{
+			if(args.size() != 2)
+				currentCommandLine = "error: set smoothing takes 2 arguments, type(int) float(value)";
+			else
+			{
+				pv.SetSmoothingLength(atoi(args[0].c_str()), (float)atof(args[1].c_str()));
+			}
+		}
+
+		void GUICommand::GetSmoothing(Previewer& pv, std::vector<std::string> args)
+		{
+			if(args.size() != 1)
+				currentCommandLine = "error: get smoothing takes 1 argument, type(int)";
+			else
+			{
+				float s = pv.GetSmoothingLength(atoi(args[0].c_str()));
+				currentCommandLine = "output: smoothing for type "+args[0]+": "+toa(s);	
+			}
+		}
+
+		//--------------------------------------------------------------------------------	
+		// Animation
+		void GUICommand::SetAnimPoint(Previewer& pv, std::vector<std::string> args)
+		{
+			if(args.size() != 1)
+				currentCommandLine = "error: set point takes 1 argument";
+			else
+			{			
+				pv.SetAnimationPoint(atoi(args[0].c_str()));
+				// Animation file is now out of date
+				pv.UnloadAnimationFile();
+				currentCommandLine = "output: point saved at time: " + args[0];
+			}
+		}	
+
+		void GUICommand::RemoveAnimPoint(Previewer& pv, std::vector<std::string> args)
+		{
+			if(args.size() != 0)
+				currentCommandLine = "error: remove point takes 0 arguments";
+			else
+			{	
+				pv.RemoveAnimationPoint();
+			}
+		}	
+
+		void GUICommand::PreviewAnim(Previewer& pv, std::vector<std::string> args)
+		{
+			if(args.size() != 0)
+				currentCommandLine = "error: preview takes 0 arguments";
+			else
+			{	
+				//pv.Interpolate();
+				//pv.PreviewAnimation();
+				currentCommandLine = "error: animation system currently being worked on";
+			}			
+		}
+
+		void GUICommand::SaveAnimFile(Previewer& pv, std::vector<std::string> args)
+		{
+			if(args.size() != 1)
+				currentCommandLine = "error: save animation takes 1 string argument";
+			else
+			{
+				//pv.Interpolate();
+			 	//pv.SaveAnimationFile(arg[0]);
+			 	currentCommandLine = "error: animation system currently being worked on";
+			}	
+		}
+
+		void GUICommand::LoadAnimFile(Previewer& pv, std::vector<std::string> args)
+		{
+			if(args.size() != 1)
+				currentCommandLine = "error: load animation takes 1 string argument";
+			else
+			{
+				//pv.LoadAnimationFile(arg[0]);
+				currentCommandLine = "error: animation system currently being worked on";
+			}				
+		}
+
+		void GUICommand::SetCamInterpolation(Previewer& pv, std::vector<std::string> args)
+		{
+			if(args.size() != 1)
+				currentCommandLine = "error: set camera interpolation takes 1 string argument";
+			else
+			{
+				if(args[0] == "linear")
+				{
+					pv.SetCameraInterpolation(LINEAR);
+				}
+				else if(args[0] == "cubic")
+				{
+					pv.SetCameraInterpolation(CUBIC);
+				}
+				else 
+				{
+					currentCommandLine = "error: Camera interpolation type unrecognised (linear or cubic)";
+				}
+			}	
+		}
+
+		void GUICommand::SetLookatInterpolation(Previewer& pv, std::vector<std::string> args)
+		{
+			if(args.size() != 1)
+				currentCommandLine = "error: set lookat interpolation takes 1 string argument";
+			else
+			{
+				// Allow you to set lookat interpolation type
+				if(args[0] == "linear")
+				{
+					pv.SetLookatInterpolation(LINEAR);
+				}
+				else if(args[0] == "cubic")
+				{
+					pv.SetLookatInterpolation(CUBIC);
+				}
+				else 
+				{
+					currentCommandLine = "error: Lookat interpolation type unrecognised (linear or cubic)";
+				}
+			}				
+		}
+
 	}
 }

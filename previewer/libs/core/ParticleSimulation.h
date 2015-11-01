@@ -29,9 +29,13 @@
 #include "../renderers/IRenderer.h"
 #include "../core/ParticleData.h"
 
-// Automatically generated header to include the current renderer
-// Created by makefile on build
-#include "../renderers/CurrentRenderer.h"
+#if defined RENDER_FF_VBO
+	#include "previewer/libs/renderers/FF_VBO.h"
+#elif defined RENDER_PP_GEOM
+	#include "previewer/libs/renderers/PP_GEOM.h"
+#elif defined RENDER_PP_FBO
+	#include "previewer/libs/renderers/PP_FBO.h"
+#endif
 
 // Usage includes
 #include "Parameter.h"
@@ -77,7 +81,7 @@ namespace previewer
 		static void SetRotationSpeed(int);
 		static int GetRotationSpeed();
 
-		void ReloadColourData();
+		void ReloadColorData();
 
 		void SetPalette(std::string paletteFilename, int particleType);
 		std::string GetPalette(int particleType);
@@ -101,6 +105,8 @@ namespace previewer
 		float GetSmoothingLength(int);
 
 		void ResetCamera();
+		void SetTarget(vec3f t);
+		void SetTargetCenter();
 		static std::string GetExePath();
 		
 	private:

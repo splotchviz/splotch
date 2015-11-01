@@ -62,10 +62,6 @@ namespace previewer
 			// Create the window
 			window = XCreateWindow(display, rootWindow, 0, 0, _width, _height, 0, xVisualInfo->depth, InputOutput, xVisualInfo->visual, CWColormap | CWEventMask, &setWindowAttributes);
 
-			// Map the window and store the window name
-			XMapWindow(display, window);
-			XStoreName(display, window, "Splotch Previewer");
-
 			// Setup the window delete message (from little x)
 			windowDeleteMessage = XInternAtom(display, "WM_DELETE_WINDOW", false);
 			if(!XSetWMProtocols(display, window, &windowDeleteMessage, 1))
@@ -73,9 +69,16 @@ namespace previewer
 				printf("WM_Protocols set failed, gui quit window may give a terminal error\n");
 			}
 
-			// Create glx context
+			// Map the window and store the window name
+			XMapWindow(display, window);
+			XStoreName(display, window, "Splotch Previewer");
+
+			// Create gl context
 			glContext = glXCreateContext(display, xVisualInfo, NULL, GL_TRUE);
 			glXMakeCurrent(display, window, glContext);
+
+			// Print current GL version
+			printf("OpenGL version supported: %s\n", glGetString(GL_VERSION));
 
 			//Clear window initially
 			glClearColor(0.2, 0.2, 0.2, 1.0);
@@ -306,6 +309,7 @@ namespace previewer
 			// Check for the type of client event
 			if((uint)xEvent.xclient.data.l[0] == windowDeleteMessage)
 			{
+				DebugPrint("Received window quit message\n");
 				// Set all the event information
 				event.eventType = evQuitApplication;
 				event.keyID = "";

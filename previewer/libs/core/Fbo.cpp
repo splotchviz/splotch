@@ -63,11 +63,10 @@ void Fbo::Load(int width, int height)
 	    //attach a renderbuffer to FBO depth attachment point
 	    glFramebufferRenderbufferEXT(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, RBOId);
 
-
 		GLenum status = glCheckFramebufferStatusEXT(GL_FRAMEBUFFER);
 		if(status == GL_FRAMEBUFFER_COMPLETE)
-			std::cout << "framebuffer creation complete" << std::endl;
-		else std::cout << "framebuffer error! " << status << std::endl;
+			DebugPrint("Framebuffer status OK\n");
+		else ErrorMessage("Framebuffer error: %u\n",status);
 
 	    //unbind
 	    glBindFramebufferEXT(GL_FRAMEBUFFER, 0);
@@ -99,8 +98,8 @@ void Fbo::Update(int width, int height)
 
 		GLenum status = glCheckFramebufferStatusEXT(GL_FRAMEBUFFER);
 		if(status == GL_FRAMEBUFFER_COMPLETE)
-			std::cout << "framebuffer update complete" << std::endl;
-		else std::cout << "framebuffer error! " << status << std::endl;
+			DebugPrint("Framebuffer update complete\n");
+		else  ErrorMessage("Framebuffer error: %u\n",status);
 
 	    //unbind
 	    glBindFramebufferEXT(GL_FRAMEBUFFER, 0);

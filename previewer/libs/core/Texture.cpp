@@ -35,7 +35,7 @@ namespace previewer
 		GLenum format = (bpp == 32) ? GL_RGBA : GL_RGB;
 
 		// Check width and height set properly on load
-		std::cout << "tga tex: w " << width << " h " << height << " bpp " << bpp << std::endl;
+		DebugPrint("Texture: w %i, h %i, bpp %i\n",width, height, bpp);
 
 		// Gl generate texture
 		glGenTextures(1, &texID);

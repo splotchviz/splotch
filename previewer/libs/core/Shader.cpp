@@ -134,7 +134,7 @@ namespace previewer
 		GLint loc = glGetAttribLocation(program,attrName.c_str());
 		if(loc == -1)
 		{
-			std::cout << "Requested shader attribute "<<attrName<<" not found in shader (or name is prefixed with gl_  - dont do that...)\n";
+			ErrorMessage("Requested shader uniform '<<attrName<<' not found in shader (or name is prefixed with gl_  - dont do that...)\n");
 		}
 		else
 		{
@@ -155,7 +155,7 @@ namespace previewer
 		GLint loc = glGetUniformLocation(program,attrName.c_str());
 		if(loc == -1)
 		{
-			std::cout << "Requested shader uniform "<<attrName<<" not found in shader (or name is prefixed with gl_  - dont do that...)\n";
+			ErrorMessage("Requested shader uniform '<<attrName<<' not found in shader (or name is prefixed with gl_  - dont do that...)\n");
 		}
 		else
 		{
@@ -179,7 +179,7 @@ namespace previewer
 		// Check other types of uniforms here if necessary - none currently used
 
 		// Inform user if not found
-		std::cout << "Uniform '"<<attrName<<"' not found in scalarUniformfs vector for shader.\n";
+		ErrorMessage("Uniform '%s' not found in scalarUniformfs vector for shader.\n",attrName.c_str());
 		return -1;
 	}
 
@@ -195,8 +195,7 @@ namespace previewer
 		char* shaderText = FileLib::loadTextFile(filename);
 		if(!shaderText)
 		{
-			std::cout << "No data in shader file!" << std::endl;
-			return 0;
+			ErrorMessage("Could not load shader file: %s", filename.c_str());
 		}
 
 		// Create shader of specific type
@@ -212,7 +211,7 @@ namespace previewer
 		delete shaderText;
 
 		// Compile shader
-		GLint compiled;
+		GLint compiled = 0;
 		glCompileShader(shader);
 
 		// Check if shader compiled correctly
@@ -220,10 +219,12 @@ namespace previewer
 
 		// If so, indicate, if not get shader compilation log and cout
 		if(compiled)
-			std::cout << "shader compilation success: " + filename << std::endl;
+		{
+			DebugPrint("Shader compiled: %s\n", filename.c_str());
+		}
 		else
 		{
-			std::cout << "compilation fail." << std::endl;
+			DebugPrint("Shader failed to compile: %s\n", filename.c_str());
 
 			int infoLogLen = 0;
 			int charsWritten = 0;
@@ -235,7 +236,7 @@ namespace previewer
 			{
 				infoLog = new GLchar[infoLogLen];
 				glGetShaderInfoLog(shader, infoLogLen, &charsWritten, infoLog);
-				std::cout << "InfoLog : " << std::endl << infoLog << std::endl;
+				std::cout << "InfoLog: " << std::endl << infoLog << std::endl;
 				delete [] infoLog;
 			}
 		}

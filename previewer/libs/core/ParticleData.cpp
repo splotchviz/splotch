@@ -35,6 +35,7 @@ namespace previewer
 		vec3 dummyCam = vec3(0,0,0);
 		vec3 dummyAt = vec3(0,0,0);
 		vec3 dummySky = vec3(0,0,0);
+		vec3 dummyCent = vec3(0,0,0);
 		std::string dummyOutfile = " ";
 	
 		// Splotch param find
@@ -46,13 +47,13 @@ namespace previewer
 		if(boost)
 		{
 			//if boost particledata is second argument(boosted data)
-			bool ret = sMaker.getNextScene(dummySplotchParticleData, particleList, dummyCam, dummyAt, dummySky, dummyOutfile);
+		  bool ret = sMaker.getNextScene(dummySplotchParticleData, particleList, dummyCam, dummyCent, dummyAt, dummySky, dummyOutfile);
 			if(!ret) std::cout << "sMaker.getNextScene failed." << std::endl;
 		}
 		else 
 		{
 			//else use full data set (first arg)
-			bool ret = sMaker.getNextScene(particleList, dummySplotchParticleData, dummyCam, dummyAt, dummySky, dummyOutfile);
+		  bool ret = sMaker.getNextScene(particleList, dummySplotchParticleData, dummyCam, dummyCent, dummyAt, dummySky, dummyOutfile);
 			if(!ret) std::cout << "sMaker.getNextScene failed." << std::endl;		
 		}
 
@@ -101,31 +102,30 @@ namespace previewer
 		// Compute and store bounding box of data
 		BBox.Compute(particleList);
 
-		DebugPrint("BBox Data");
-		DebugPrint("minX: ", BBox.minX);
-		DebugPrint("maxX: ", BBox.maxX);
-		DebugPrint("miny: ", BBox.minY);
-		DebugPrint("maxY: ", BBox.maxY);
-		DebugPrint("minZ: ", BBox.minZ);
-		DebugPrint("maxZ: ", BBox.maxZ);
+		DebugPrint("Particles loaded\nbbox data:\n");
+		DebugPrint("minX: %f\n", BBox.minX);
+		DebugPrint("maxX: %f\n", BBox.maxX);
+		DebugPrint("miny: %f\n", BBox.minY);
+		DebugPrint("maxY: %f\n", BBox.maxY);
+		DebugPrint("minZ: %f\n", BBox.minZ);
+		DebugPrint("maxZ: %f\n", BBox.maxZ);
 
-		DebugPrint("Particle Data has been loaded");
-		DebugPrint("Number of particles to be rendered: ", (int)particleList.size());
+		DebugPrint("Number of particles to be rendered: %i\n", (int)particleList.size());
 
 	}	
 
-	void ParticleData::ReloadColourData()
+	void ParticleData::ReloadColorData()
 	{
-		DebugPrint("Reloading colour data");
+		DebugPrint("Reloading color data\n");
 
 		// Get new colourmaps
 		int ret = FileLib::LoadColourPalette(Previewer::parameterInfo, colourMaps);
 		if(!ret)
 		{
-			std::cout << "Colour palette is invalid" << std::endl;
+			std::cout << "Color palette is invalid" << std::endl;
 			return;
 		}
-
+DebugPrint("Reloading color data\n");
 		//Reload colour data with new palette
 		for(unsigned i = 0; i < particleList.size(); i++)
 		{
@@ -133,40 +133,40 @@ namespace previewer
 				// Use original RGB data as particleList's colour data will have been overwritten
 				particleList[i].e = colourMaps[particleList[i].type].getVal_const(OriginalRGBData[i].x)  ;
 		}
-
+DebugPrint("Reloading color data\n");
 		for(unsigned i = 0; i < numTypes; i++)
 		{
 			if(!colour_is_vec[i])
-				DebugPrint("Loaded new colours for type: ", i);
+				DebugPrint("Loaded new colours for type: %i\n", i);
 			else
-				DebugPrint("Colour is vector, so no new palette to load for type: ", i);
+				DebugPrint("Colour is vector, so no new palette to load for type: %i\n", i);
 		}
 
 	}
 
 	void ParticleData::SetPalette(std::string paletteFilename, int particleType)
 	{
-		DebugPrint("Setting new palette");
+		DebugPrint("Setting new palette\n");
 
 		paramfile* splotchParams = Previewer::parameterInfo.GetParamFileReference();
 
-		DebugPrint("Got file ref");
+		// Check type is valid
+		if(particleType >= splotchParams->find<int>("ptypes"))
+		{
+			ErrorMessage("No particles of type %i\n", particleType);
+		}
 
 		// Check if particle type has vector colour
 		if (splotchParams->find<bool>("color_is_vector"+dataToString(particleType),false))
 		{
-			std::cout << " color of ptype " << particleType << " is vector, so cannot set new colourMap ..." << std::endl;
-			return;
+			ErrorMessage("Color of ptype %i is vector, so cannot set new colourMap\n", particleType);
 		}
-
-		DebugPrint("Checked for vector colour");
  
 		// Return if there is no palette parameter available for specified particle type
 		// E.G. particle type is invalid
 		if(!splotchParams->param_present("palette"+dataToString(particleType)))
 		{
-			std::cout << "Cannot set new palette for particle type " << particleType << std::endl;
-			return;
+			ErrorMessage("Cannot set new palette for particle type %i \n", particleType);
 		}
 
 		DebugPrint("Checked for present parameter");
@@ -174,14 +174,12 @@ namespace previewer
 		// Write new palette filename to parameter file
 		splotchParams->setParam<std::string>("palette"+dataToString(particleType),paletteFilename);
 
-		DebugPrint("Set new parameter");
+		DebugPrint("Set new parameter\n");
 	}
 
 	std::string ParticleData::GetPalette(int particleType)
 	{
 		paramfile* splotchParams = Previewer::parameterInfo.GetParamFileReference();
-
-		DebugPrint("Got file ref");
 
 		if(!splotchParams->param_present("palette"+dataToString(particleType)))
 		{

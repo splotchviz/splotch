@@ -30,7 +30,6 @@ namespace previewer
 	// Implement the constructor
 	OnExposedEvent::OnExposedEvent()
 	{
-		DebugPrint("OnExposed Event Subscription");
 
 		if(!eventSubs)
 		{
@@ -44,8 +43,6 @@ namespace previewer
 	// Implement the destructor
 	OnExposedEvent::~OnExposedEvent()
 	{
-		DebugPrint("OnExposed Event Unsubscription");
-
 		// Remove the subclass from the subscribers list
 		eventSubs->remove(dynamic_cast<OnExposedEvent*>(this));
 	}

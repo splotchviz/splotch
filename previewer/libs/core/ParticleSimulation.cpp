@@ -46,14 +46,14 @@ namespace previewer
 	int ParticleSimulation::yres = 0;
 
 	bool ParticleSimulation::firstRun = true;
-	IRenderer* ParticleSimulation::renderer;
+	IRenderer* ParticleSimulation::renderer = NULL;
 	ParticleData ParticleSimulation::particles;
 	std::string ParticleSimulation::exepath = "";
 
 
 	void ParticleSimulation::Load(std::string _exepath)
 	{
-		DebugPrint("Particle Simulation being loaded with parameters");
+		DebugPrint("Loading particle simulation\n");
 
 		// Store path of executable
 		exepath = _exepath;
@@ -63,7 +63,6 @@ namespace previewer
 
 		// Get resolution from parameter file
 		paramfile* splotchParams =  Previewer::parameterInfo.GetParamFileReference();
-
 		xres = splotchParams->find<int>("xres",800);
 		yres = splotchParams->find<int>("yres",xres);
 		aspectRatio = (float)xres/(float)yres;
@@ -85,17 +84,16 @@ namespace previewer
 		renderer = new PP_GEOM();
 #elif defined RENDER_PP_FBO
 		renderer = new PP_FBO();
-#elif defined RENDER_PP_FBOF
-		renderer = new PP_FBOF();
 #endif
-		DebugPrint("Render reference has been created");
+		if(renderer)
+			DebugPrint("Render reference has been created\n");
+		else
+		{
+			ErrorMessage("Previewer renderer reference creation failed");
+		}
 
 		// Load renderer and pass particle data
 		renderer->Load(particles);
-
-		DebugPrint("Renderer has Loaded Particle Data");
-
-		// Setup other renderer stuff here
 
 	}
 
@@ -104,21 +102,17 @@ namespace previewer
 		// Update (do not force)
 		Update(false);
 
-		//DebugPrint("Running Particle Simulation frame");
-
 		// Draw splotch created image if (viewingImage), otherwise draw simulation
 		if(viewingImage)
 			renderer->DrawImage(renderXMin, renderYMin, renderWidth, renderHeight);
 		else
 			renderer->Draw();
-		
-		//PrintOpenGLError();
 
 	}
 
 	void ParticleSimulation::Unload()
 	{
-		DebugPrint("Unloading Particle Simulation");
+		DebugPrint("Unloading Particle Simulation\n");
 	}
 
 	void ParticleSimulation::Update(bool forced)
@@ -264,20 +258,19 @@ namespace previewer
 		return rotationSpeed;
 	}
 
-	void ParticleSimulation::ReloadColourData()
+	void ParticleSimulation::ReloadColorData()
 	{
 
-		particles.ReloadColourData();
+		particles.ReloadColorData();
 
 		// Reload instance of appropriate renderer, as specified in the makefile
+		delete renderer;
 #if defined RENDER_FF_VBO
 		renderer = new FF_VBO();
 #elif defined RENDER_PP_GEOM
 		renderer = new PP_GEOM();
 #elif defined RENDER_PP_FBO
 		renderer = new PP_FBO();
-#elif defined RENDER_PP_FBOF
-		renderer = new PP_FBOF();
 #endif
 		
 		renderer->Load(particles);
@@ -344,23 +337,33 @@ namespace previewer
 	void ParticleSimulation::ViewImage(std::string file)
 	{
 		// check image exists first!
-		viewingImage = true;
-		renderer->LoadImage(file);
+		if(FileLib::FileExists(file.c_str()))
+		{
+			viewingImage = true;
+			renderer->LoadImage(file);
 
-		// Set temporary resolutions for drawing image and do not update parameter with these.
-		SetXRes(renderer->GetImageWidth(), false);
-		SetYRes(renderer->GetImageHeight(), false);
+			// Set temporary resolutions for drawing image and do not update parameter with these.
+			SetXRes(renderer->GetImageWidth(), false);
+			SetYRes(renderer->GetImageHeight(), false);
+		}
+		else
+		{
+			ErrorMessage("Image file does not exist: %s\n", file.c_str());
+		}
 	}
 
 	void ParticleSimulation::StopViewingImage()
 	{
-		// Stop viewing image
-		viewingImage = false;
+		if(viewingImage)
+		{
+			// Stop viewing image
+			viewingImage = false;
 
-		// Restore correct resolution from param file
-		paramfile* splotchParams =  Previewer::parameterInfo.GetParamFileReference();
-		SetXRes(splotchParams->find<int>("xres"), false);
-		SetYRes(splotchParams->find<int>("yres"), false);
+			// Restore correct resolution from param file
+			paramfile* splotchParams =  Previewer::parameterInfo.GetParamFileReference();
+			SetXRes(splotchParams->find<int>("xres"), false);
+			SetYRes(splotchParams->find<int>("yres"), false);
+		}
 	}
 
 	void ParticleSimulation::SetRenderBrightness(int type, float b)
@@ -386,6 +389,16 @@ namespace previewer
 	void ParticleSimulation::ResetCamera()
 	{
 		renderer->ResetCamera();
+	}
+
+	void ParticleSimulation::SetTarget(vec3f t)
+	{
+		renderer->SetTarget(t);
+	}
+
+	void ParticleSimulation::SetTargetCenter()
+	{
+		renderer->SetTargetCenter();
 	}
 
 	std::string ParticleSimulation::GetExePath()

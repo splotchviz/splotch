@@ -35,17 +35,20 @@ namespace previewer
 
 			// Create a window
 			window.Create();
-			window.LoadFont("-misc-fixed-medium-r-semicondensed--0-0-75-75-c-0-iso8859-1");
-
-			// Set render size and position
-			application.SetRenderSize(800, 800);
-			application.SetRenderPosition(0,0);
 
 			// If file exists load application
 			if(FileLib::FileExists(const_cast<char*>(paramFile.c_str())))
 			{
 				application.Load(paramFile);
 			}
+
+			// Once we've loaded the application, check paramfile for a font
+			std::string font = application.GetParameter("xfont", "-misc-fixed-medium-r-semicondensed--0-0-75-75-c-0-iso8859-1");
+			window.LoadFont(font);
+
+			// Set render size and position
+			application.SetRenderSize(800, 800);
+			application.SetRenderPosition(0,0);
 
 			Run();
 		}
@@ -124,7 +127,6 @@ namespace previewer
 				// See if application is terminating
 				if(command.IsTerminating())
 				{
-					DebugPrint("Command is Terminating");
 					isApplicationTerminating = true;
 				}
 			}

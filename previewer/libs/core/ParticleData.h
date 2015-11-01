@@ -47,7 +47,7 @@ namespace previewer
 	public:
 		void Load();
 
-		void ReloadColourData();
+		void ReloadColorData();
 
 		void SetPalette(std::string paletteFilename, int particleType);
 		std::string GetPalette(int particleType);

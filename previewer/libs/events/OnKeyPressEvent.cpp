@@ -29,7 +29,6 @@ namespace previewer
 	// Implement the constructor
 	OnKeyPressEvent::OnKeyPressEvent()
 	{
-		DebugPrint("OnKeyPress Event Subscription");
 
 		if(!eventSubs)
 		{
@@ -43,7 +42,6 @@ namespace previewer
 	// Implement the destructor
 	OnKeyPressEvent::~OnKeyPressEvent()
 	{
-		DebugPrint("OnKeyPress Event Unsubscription");
 
 		// Remove the subclass from the subscribers list
 		eventSubs->remove(dynamic_cast<OnKeyPressEvent*>(this));
@@ -52,7 +50,6 @@ namespace previewer
 	// Implement the Caller
 	void OnKeyPressEvent::CallEvent(Event ev)
 	{
-		//DebugPrint("OnKeyPress Event Call");
 
 		if(eventSubs)
 		{

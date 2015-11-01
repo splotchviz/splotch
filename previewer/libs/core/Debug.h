@@ -23,17 +23,16 @@
 #define SPLOTCH_PREVIEWER_DEBUG_MODE
 
 //Debug include
-#include "previewer/libs/core/Debug.h"
-
-#include "GL/gl.h"
+#include <cstdarg>
 #include <iostream>
+#include "cxxsupport/vec3.h"
 
-void DebugPrint(std::string);
-void DebugPrint(std::string, int);
-void DebugPrint(std::string, unsigned);
-void DebugPrint(std::string, float);
-void DebugPrint(std::string, std::string);
+#ifdef PREVIEWER_OPENGL
+#include "GL/gl.h"
+#endif
 
+void ErrorMessage(const char* s, ...);
+void DebugPrint(const char* s, ...);
 void PrintOpenGLError();
 
 #endif

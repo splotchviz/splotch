@@ -35,6 +35,8 @@
 #include "previewer/libs/core/Event.h"
 #include "previewer/libs/events/OnKeyPressEvent.h"
 #include "previewer/libs/events/OnMotionEvent.h"
+ #include "previewer/libs/events/OnButtonPressEvent.h"
+
 
 #include "GL/gl.h"
 
@@ -45,7 +47,8 @@ namespace previewer
 	// must implement the IRenderer interface for them to be accessible
 	// to the particle simulation
 	class IRenderer :  	public OnKeyPressEvent,
-						public OnMotionEvent
+						public OnMotionEvent,
+						public OnButtonPressEvent
 	{
 	public:
 		
@@ -58,6 +61,7 @@ namespace previewer
 
 		virtual void OnKeyPress(Event) = 0;
 		virtual void OnMotion(Event) = 0;
+		virtual void OnButtonPress(Event) = 0;
 
 		void Clear(float r, float g, float b, float a)
 		{	
@@ -95,8 +99,6 @@ namespace previewer
 			glEnd();
 
 			imageViewingMaterial->Unbind();
-
-			//PrintOpenGLError();
 		}
 
 		// Get a camera reference
@@ -158,6 +160,16 @@ namespace previewer
 		void ResetCamera()
 		{
 			camera.Create(dataBBox);
+		}
+
+		void SetTarget(vec3f t)
+		{
+			camera.SetTarget(t);
+		}
+
+		void SetTargetCenter()
+		{
+			camera.SetTarget(dataBBox.centerPoint);
 		}
 
 	protected:

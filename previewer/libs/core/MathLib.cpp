@@ -85,28 +85,39 @@ void Matrix4::rotate(const vec3f &axis, float degrees)
 
 Matrix4 perspective( float fovx, float ar, float near, float far )
 {
-    float range = tan( Math::degreesToRadians(fovx) / 2.0f ) * near;
-    float left = -range;
-    float right = range;
-    float bottom = -range / ar;
-    float top = range / ar;
+    // float range = tan( Math::degreesToRadians(fovx) / 2.0f ) * near;
+    // float left = -range;
+    // float right = range;
+    // float bottom = -range / ar;
+    // float top = range / ar;
 
     Matrix4 result;
-    result[0][0] = (2.0f * near) / (right - left);
-    result[0][1] = 0;
-    result[0][2] = 0;
-    result[0][3] = 0;
-    result[1][0] = 0;
-    result[1][1] = (2.0f * near) / (top - bottom);
-    result[1][2] = 0;
-    result[1][3] = 0;
-    result[2][0] = 0;
-    result[2][1] = 0;
-    result[2][2] = - (far + near) / (far - near);
-    result[2][3] = - 1.0f;
-    result[3][0] = 0;
-    result[3][1] = 0;
-    result[3][2] = - 2.0f * ( far * near) / (far - near);
+    result.identity();
+    // result[0][0] = (2.0f * near) / (right - left);
+    // result[0][1] = 0;
+    // result[0][2] = 0;
+    // result[0][3] = 0;
+    // result[1][0] = 0;
+    // result[1][1] = (2.0f * near) / (top - bottom);
+    // result[1][2] = 0;
+    // result[1][3] = 0;
+    // result[2][0] = 0;
+    // result[2][1] = 0;
+    // result[2][2] = - (far + near) / (far - near);
+    // result[2][3] = - 1.0f;
+    // result[3][0] = 0;
+    // result[3][1] = 0;
+    // result[3][2] = - 2.0f * ( far * near) / (far - near);
+    // result[3][3] = 0;
+
+    float frustumDepth = far - near;
+    float oneOverDepth = 1 / frustumDepth;
+
+    result[1][1] = 1 / tan(0.5f * Math::degreesToRadians(fovx));
+    result[0][0] =  -1 * result[1][1] / ar;
+    result[2][2] = far * oneOverDepth;
+    result[3][2] = (-far * near) * oneOverDepth;
+    result[2][3] = 1;
     result[3][3] = 0;
     return result;
 }

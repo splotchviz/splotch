@@ -22,6 +22,7 @@
 #define GL_GLEXT_PROTOTYPES
 
 #include <iostream>
+ #include "previewer/libs/core/Debug.h"
 #include "GL/gl.h"
 
 class Fbo {
