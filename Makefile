@@ -82,7 +82,7 @@ SUP_INCL = -I. -Icxxsupport -Ic_utils
 
 
 # optimization and warning flags (g++)
-OPTIMIZE =  -pedantic -Wno-long-long -Wfatal-errors -Wextra -Wall -Wstrict-aliasing=2 -Wundef -Wshadow -Wwrite-strings -Wredundant-decls -Woverloaded-virtual -Wcast-qual -Wcast-align -Wpointer-arith -std=c++11
+OPTIMIZE =  -pedantic -Wno-long-long -Wfatal-errors -Wextra -Wall -Wstrict-aliasing=2 -Wundef -Wshadow -Wwrite-strings -Wredundant-decls -Woverloaded-virtual -Wcast-qual -Wcast-align -Wpointer-arith #-std=c++11
 #-Wno-newline-eof -g
 #-Wold-style-cast -std=c++11
 ifeq ($(SYSTYPE),"generic")
@@ -349,7 +349,7 @@ OBJS  =	kernel/transform.o cxxsupport/error_handling.o \
 	      cxxsupport/announce.o cxxsupport/ls_image.o reader/gadget_reader.o \
 	      reader/millenium_reader.o reader/bin_reader.o reader/bin_reader_mpi.o reader/tipsy_reader.o \
 	      splotch/splotchutils.o splotch/splotch.o \
-	      splotch/scenemaker.o splotch/splotch_host.o splotch/new_renderer.o cxxsupport/walltimer.o c_utils/walltime_c.o \
+	      splotch/scenemaker.o splotch/splotch_host.o cxxsupport/walltimer.o c_utils/walltime_c.o \
 	      booster/mesh_creator.o booster/randomizer.o booster/p_selector.o booster/m_rotation.o \
 	      reader/ramses_reader.o reader/enzo_reader.o reader/bonsai_reader.o reader/ascii_reader.o
 
