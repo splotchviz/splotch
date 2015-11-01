@@ -39,7 +39,6 @@ using namespace std;
 void p_selector(vector<particle_sim> &points, Mesh_vis * Mesh, Mesh_dim MeshD, vector<particle_sim> &r_points)
 {
 
-   float fraction=1.0;
    long npart=points.size();
    srand ( time(NULL) );
 
@@ -67,10 +66,10 @@ void p_selector(vector<particle_sim> &points, Mesh_vis * Mesh, Mesh_dim MeshD, v
 
         r_points.push_back(points[first]);
         first ++;
-        
+
       }
       }
-   }  
+   }
    cout << "processed cells = " << count << endl;
    cout << "processed particles = " << r_points.size() << endl;
 

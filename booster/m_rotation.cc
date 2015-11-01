@@ -67,8 +67,6 @@ float gauss_weight(float dist, float sigma)
 
 void m_rotation(paramfile &params, Mesh_vis ** p, Mesh_dim MeshD, const vec3 &campos, const vec3 &lookat, vec3 sky)
   {
-  int xres = params.find<int>("xres",800),
-      yres = params.find<int>("yres",xres);
   float32 zmaxval = params.find<float32>("zmax",1.e23),
           zminval = params.find<float32>("zmin",0.0);
   zminval = max(0.f,zminval);
@@ -109,7 +107,7 @@ void m_rotation(paramfile &params, Mesh_vis ** p, Mesh_dim MeshD, const vec3 &ca
 
   long m;
   for (m=0; m<npart; ++m)
-   { 
+   {
     (*p)[m].active = true;
     (*p)[m].weight = 0.0;
     vec3 v((*p)[m].posx,(*p)[m].posy,(*p)[m].posz);
@@ -123,7 +121,7 @@ void m_rotation(paramfile &params, Mesh_vis ** p, Mesh_dim MeshD, const vec3 &ca
 
     if (v.z<=zminval) {(*p)[m].active = false; continue;};
     if (v.z>=zmaxval) {(*p)[m].active = false; continue;};
- 
+
     float effvx = v.x - (fabs(v.x)/v.x)*diag;
     float effvy = v.y - (fabs(v.y)/v.y)*diag;
     float effvv2 = effvx*effvx + effvy*effvy;
