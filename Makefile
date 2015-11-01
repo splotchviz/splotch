@@ -1,3 +1,8 @@
+# module for SuperMUC
+#module unload mpi.ibm
+#module load mpi.ibm/1.3_gcc
+#module load gcc/5.1
+
 #######################################################################
 #  Splotch V6                                                      #
 #######################################################################
@@ -6,7 +11,7 @@
 #OPT += -DPREVIEWER
 
 #--------------------------------------- Switch on DataSize
-#OPT += -DLONGIDS
+OPT += -DLONGIDS
 
 #--------------------------------------- Switch on MPI
 OPT += -DUSE_MPI
@@ -14,15 +19,15 @@ OPT += -DUSE_MPI
 
 #--------------------------------------- Switch on HDF5
 
-#OPT += -DHDF5
+# OPT += -DHDF5
 #OPT += -DH5_USE_16_API
 
 #--------------------------------------- Visual Studio Option
 #OPT += -DVS
 
 #--------------------------------------- CUDA options
-OPT += -DCUDA
-OPT += -DHYPERQ
+#OPT += -DCUDA
+#OPT += -DHYPERQ
 
 #--------------------------------------- OpenCL options
 #OPT += -DOPENCL
@@ -34,7 +39,11 @@ OPT += -DHYPERQ
 #--------------------------------------- Turn off Intensity  normalization
 #OPT += -DNO_I_NORM
 
+#--------------------------------------- MIC options
+# OPT += -DMIC
+
 #--------------------------------------- Select target Computer
+SYSTYPE="SuperMuc"
 #SYSTYPE="generic"
 #SYSTYPE="mac"
 #SYSTYPE="SP6"
@@ -43,7 +52,13 @@ OPT += -DHYPERQ
 #SYSTYPE="BGP"
 #SYSTYPE="VIZ"
 #SYSTYPE="EIGER"
-SYSTYPE="TODI"
+#SYSTYPE="TODI"
+#SYSTYPE="DAINT"
+
+### Dommic cluster as CSCS:
+#SYSTYPE="DMC-native"
+#SYSTYPE="DMC-offload"
+
 ### visualization cluster at the Garching computing center (RZG):
 #SYSTYPE="RZG-SLES11-VIZ"
 ### generic SLES11 Linux machines at the Garching computing center (RZG):
@@ -59,25 +74,34 @@ else
  CC       = g++
 endif
 
+# OpenMP compiler switch
+OMP      = -fopenmp
+
+
+SUP_INCL = -I. -Icxxsupport -Ic_utils
+
+
 # optimization and warning flags (g++)
-OPTIMIZE = -std=c++98 -pedantic -Wno-long-long -Wfatal-errors -Wextra -Wall -Wstrict-aliasing=2 -Wundef -Wshadow -Wwrite-strings -Wredundant-decls -Woverloaded-virtual -Wcast-qual -Wcast-align -Wpointer-arith #-Wold-style-cast
+OPTIMIZE =  -pedantic -Wno-long-long -Wfatal-errors -Wextra -Wall -Wstrict-aliasing=2 -Wundef -Wshadow -Wwrite-strings -Wredundant-decls -Woverloaded-virtual -Wcast-qual -Wcast-align -Wpointer-arith -std=c++11
+#-Wno-newline-eof -g
+#-Wold-style-cast -std=c++11
 ifeq ($(SYSTYPE),"generic")
 # OPTIMIZE += -O2 -g -D TWOGALAXIES
  OPTIMIZE += -O2 -g
 
 # Generic 64bit cuda setup
 ifeq (CUDA,$(findstring CUDA,$(OPT)))
-NVCC       =  nvcc -g 
-CUDA_HOME  =  /opt/cuda
+NVCC       =  nvcc
+CUDA_HOME  =  /opt/nvidia/cudatoolkit/default
 LIB_OPT  += -L$(CUDA_HOME)/lib64 -lcudart
 SUP_INCL += -I$(CUDA_HOME)/include
+NVCCFLAGS = -g -arch=sm_30 -dc
 endif
 
 endif
 
 # OpenMP compiler switch
 #OMP      = -fopenmp
-
 SUP_INCL = -I. -Icxxsupport -Ic_utils
 
 #CUDA_HOME = /usr/local/cuda/
@@ -85,10 +109,49 @@ ifeq (USE_MPIIO,$(findstring USE_MPIIO,$(OPT)))
  SUP_INCL += -Impiio-1.0/include/
 endif
 
+# NOTE: This is for osx >=10.9 i.e. clang not gcc
+# Openmp isnt supported by default, so you must modify the paths to point to your
+# build of clang with openmp support and an openmp runtime library as done below
+# Dont forget to export DYLD_LIBRARY_PATH for the omp and cuda runtime libs
 ifeq ($(SYSTYPE),"mac")
+  OPT += -DSPLOTCHMAC
+  ifeq (CUDA,$(findstring CUDA,$(OPT)))
+	#CC = CC
+	NVCC = nvcc
+	CUDA_HOME = /Developer/NVIDIA/CUDA-7.0/
+	OPTIMIZE = -Wall -stdlib=libstdc++ -Wno-unused-function -Wno-unused-variable -Wno-unused-const-variable
+	LIB_OPT  += -L$(CUDA_HOME)/lib -lcudart
+	NVCCFLAGS = -g -ccbin /usr/bin/clang -arch=sm_30 -dc
+	SUP_INCL += -I$(CUDA_HOME)/include
+	ifeq (-fopenmp,$(OMP))
+		# Modify ccbin argument to point to your OpenMP enabled clang build (note clang++, this is important)
+		NVCCFLAGS = -g -ccbin /Users/tims/Programs/Clang-OpenMP/build/Debug+Asserts/bin/clang++ -arch=sm_30 -dc
+	endif
+  endif
+	ifeq (-fopenmp,$(OMP))
+		# Change this as above
+		CC = /Users/tims/Programs/Clang-OpenMP/build/Debug+Asserts/bin/clang++
+		OPTIMIZE = -Wall -stdlib=libstdc++ -Wno-unused-function -Wno-unused-variable -Wno-unused-const-variable
+		# These should point to your include and library folders for an openmp runtime library
+		SUP_INCL += -I/Users/tims/Programs/Intel-OMP-RT/libomp_oss/exports/common/include/
+		LIB_OPT += -L/Users/tims/Programs/Intel-OMP-RT/libomp_oss/exports/mac_32e/lib.thin/
+	endif
+	ifeq (PREVIEWER,$(findstring PREVIEWER,$(OPT)))
+		SUP_INCL += -I/opt/X11/include
+	endif
+    ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
+    	CC = mpic++
+    endif
+endif
 
-SUP_INCL += -I/usr/X11/include -include uint_typedef.h
-
+ifeq ($(SYSTYPE),"SuperMuc")
+ ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
+  CC       = mpiCC
+ else
+  CC       = ifc
+ endif
+ OPTIMIZE = -O3 -g -std=c++11
+ OMP =   -fopenmp
 endif
 
 # Configuration for the VIZ visualization cluster at the Garching computing centre (RZG):
@@ -108,6 +171,24 @@ ifeq ($(SYSTYPE),"RZG-SLES11-VIZ")
  OMP       = -fopenmp
 endif
 
+# Configuration for DOMMIC at CSCS
+ifeq ($(SYSTYPE),"DMC-native")
+  CC = icpc -mmic -O2
+#-vec-report6
+  OPTIMIZE = -std=c++11 -pedantic -Wfatal-errors -Wextra -Wall -Wstrict-aliasing=2 -Wundef -Wshadow -Wwrite-strings -Woverloaded-virtual -Wcast-qual -Wpointer-arith
+endif
+ifeq ($(SYSTYPE),"DMC-offload")
+  ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
+   CC = mpiicpc
+  else
+   CC = icpc
+  endif
+ OPTIMIZE = -Wall -O2
+ #-opt-report-phase=offload
+ #-vec-report2
+ # -guide -parallel
+endif
+
 # configuration for TODI at CSCS
 ifeq ($(SYSTYPE),"TODI")
  ifeq (HDF5,$(findstring HDF5,$(OPT)))
@@ -116,7 +197,7 @@ ifeq ($(SYSTYPE),"TODI")
   HDF5_INCL = -I$(HDF5_HOME)/include
  endif
  ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
-   CC       = CC 
+   CC       = CC
  else
    CC       = g++ -DDEVS_PER_NODE=1
    #CC       = CC -DDEVS_PER_NODE=1 -DTODI
@@ -128,6 +209,29 @@ SUP_INCL += -I$(CUDATOOLKIT_HOME)/include
 endif
  OPTIMIZE = -O3
 # OMP      = -fopenmp
+endif
+
+# Configuration for PIZ DAINT at CSCS
+ifeq ($(SYSTYPE), "DAINT")
+
+ifeq (CUDA, $(findstring CUDA, $(OPT)))
+CUDATOOLKIT_HOME=/opt/nvidia/cudatoolkit/5.5.20-1.0501.7945.8.2/
+NVCC = nvcc
+NVCCARCH = -arch=sm_30
+NVCCFLAGS = -g  $(NVCCARCH) -dc -use_fast_math
+LIB_OPT  += -L$(CUDATOOLKIT_HOME)/lib64 -lcudart
+SUP_INCL += -I$(CUDATOOLKIT_HOME)/include
+OPTIMIZE = -O3
+endif
+ ifeq (HDF5,$(findstring HDF5,$(OPT)))
+  HDF5_HOME = /opt/cray/hdf5-parallel/1.8.13/gnu/48/
+  LIB_HDF5  = -L$(HDF5_HOME)lib -Wl,-rpath,$(HDF5_HOME)/lib -lhdf5 -lz
+  HDF5_INCL = -I$(HDF5_HOME)include
+ endif
+ ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
+	CC = cc
+endif
+
 endif
 
 # Configuration for SLES11 Linux clusters at the Garching computing centre (RZG):
@@ -192,10 +296,10 @@ ifeq ($(SYSTYPE),"GP")
  ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
   CC       =  mpicxx -g -I$(CUDA_HOME)/sdk/common/inc -I$(CUDA_HOME)/sdk/C/common/inc -I$(CUDA_HOME)/include
  endif
- NVCC       =  nvcc -g 
+ NVCC       =  nvcc -g
  OPTIMIZE = -O2
  LIB_OPT  =  -L$(CUDA_HOME)/lib -L$(CUDA_HOME)/lib64 -lcudart
- OMP =  
+ OMP =
  #-Xcompiler -openmp
  SUP_INCL += -I$(CUDA_HOME)/sdk/common/inc -I$(CUDA_HOME)/sdk/C/common/inc # -I$(CUDA_HOME)/include  -Icuda
 endif
@@ -213,7 +317,7 @@ endif
 
 ifeq ($(SYSTYPE),"PLX")
  ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
-  CC  =  mpiCC -g 
+  CC  =  mpiCC -g
  else
   CC  = g++
  endif
@@ -222,7 +326,7 @@ ifeq ($(SYSTYPE),"PLX")
  ifeq (CUDA,$(findstring CUDA,$(OPT)))
   NVCC = nvcc -arch sm_20 -use_fast_math
   LIB_OPT  =  -L$(CUDA_HOME)/lib64 -lcudart
-  SUP_INCL += -I$(CUDA_HOME)/include -I$(CUDA_SDK)/CUDALibraries/common/inc 
+  SUP_INCL += -I$(CUDA_HOME)/include -I$(CUDA_SDK)/CUDALibraries/common/inc
  endif
  ifeq (OPENCL,$(findstring OPENCL,$(OPT)))
   LIB_OPT  =  -L$(CUDA_HOME)/lib64 -L$(CUDA_HOME)/lib -lOpenCL
@@ -230,7 +334,7 @@ ifeq ($(SYSTYPE),"PLX")
  endif
 endif
 
-#-L/home/pavel/NVIDIA_GPU_Computing_SDK/shared/lib 
+#-L/home/pavel/NVIDIA_GPU_Computing_SDK/shared/lib
 #
 #--------------------------------------- Here we go
 
@@ -245,13 +349,13 @@ OBJS  =	kernel/transform.o cxxsupport/error_handling.o \
 	      cxxsupport/announce.o cxxsupport/ls_image.o reader/gadget_reader.o \
 	      reader/millenium_reader.o reader/bin_reader.o reader/bin_reader_mpi.o reader/tipsy_reader.o \
 	      splotch/splotchutils.o splotch/splotch.o \
-	      splotch/scenemaker.o splotch/splotch_host.o cxxsupport/walltimer.o c_utils/walltime_c.o \
+	      splotch/scenemaker.o splotch/splotch_host.o splotch/new_renderer.o cxxsupport/walltimer.o c_utils/walltime_c.o \
 	      booster/mesh_creator.o booster/randomizer.o booster/p_selector.o booster/m_rotation.o \
-	      reader/ramses_reader.o reader/enzo_reader.o
+	      reader/ramses_reader.o reader/enzo_reader.o reader/bonsai_reader.o reader/ascii_reader.o
 
 OBJS1 = galaxy/Galaxy.o galaxy/GaussRFunc.o galaxy/Box_Muller.o galaxy/ReadBMP.o \
 	galaxy/CalculateDensity.o galaxy/CalculateColours.o galaxy/GlobularCluster.o \
-	galaxy/ReadImages.o galaxy/TirificWarp.o
+	galaxy/ReadImages.o galaxy/TirificWarp.o galaxy/Disk.o galaxy/RDiscFuncTirific.o
 
 OBJSC = cxxsupport/paramfile.o cxxsupport/error_handling.o cxxsupport/mpi_support.o \
 	c_utils/walltime_c.o cxxsupport/string_utils.o \
@@ -260,23 +364,32 @@ OBJSC = cxxsupport/paramfile.o cxxsupport/error_handling.o cxxsupport/mpi_suppor
 ifeq (HDF5,$(findstring HDF5,$(OPT)))
  OBJS += reader/hdf5_reader.o
  OBJS += reader/gadget_hdf5_reader.o
- OBJS += reader/galaxy_reader.o
+ #OBJS += reader/galaxy_reader.o
+ #OBJS += reader/h5part_reader.o
 endif
 
+# OpenCL and CUDA config
 ifeq (OPENCL,$(findstring OPENCL,$(OPT)))
  OBJS += opencl/splotch.o opencl/CuPolicy.o opencl/splotch_cuda2.o opencl/deviceQuery.o
 else
- ifeq (CUDA,$(findstring CUDA,$(OPT)))
-  OBJS += cuda/splotch.o cuda/CuPolicy.o cuda/splotch_cuda2.o cuda/deviceQuery.o
+ifeq (CUDA,$(findstring CUDA,$(OPT)))
+  OBJS += cuda/cuda_splotch.o cuda/cuda_policy.o cuda/cuda_utils.o cuda/cuda_device_query.o cuda/cuda_kernel.o cuda/cuda_render.o
+  CULINK = cuda/cuda_link.o
  endif
+endif
+
+# Intel MIC config
+ifeq (MIC,$(findstring MIC,$(OPT)))
+OBJS += mic/mic_splotch.o mic/mic_compute_params.o mic/mic_kernel.o mic/mic_allocator.o
+OPTIONS += -offload-option,mic,compiler," -fopenmp -Wall -O3 -L. -z defs"
 endif
 
 ifeq (USE_MPIIO,$(findstring USE_MPIIO,$(OPT)))
  LIB_MPIIO = -Lmpiio-1.0/lib -lpartition
 endif
 
-###################################################
-#        Splotch Previewer         
+##################################################
+#        SPLOTCH PREVIEWER SECTION
 ##################################################
 
 # Please choose rendering method. Choice will depend on your current drivers, OpenGL implementation and hardware capabilities
@@ -284,35 +397,35 @@ endif
 # use FFSVBO, this uses the fixed function pipeline and should be available on most if not all hardware setups that support opengl.
 #
 # Uncomment below to use Fixed Function software rendering with Vertex Buffer Objects (faster method if no hardware acceleration)
-#---------------------------------- 
-# RENDER_METHOD = FFSVBO
-#---------------------------------- 
+#----------------------------------
+#RENDER_METHOD = -DRENDER_FF_VBO
+#----------------------------------
 #
 # Uncomment below to use Programmable Pipeline rendering using Vertex Buffer Objects and shaders + geometry shader
-#---------------------------------- 
-# RENDER_METHOD = PPGEOM
-#---------------------------------- 
+#----------------------------------
+#RENDER_METHOD = -DRENDER_PP_GEOM
+#----------------------------------
 #
 # Uncomment below to use Programmable Pipeline rendering using Vertex Buffer Objects and shaders + geometry shader + FBOs
-#---------------------------------- 
-RENDER_METHOD = PPFBO
+#----------------------------------
+RENDER_METHOD = -DRENDER_PP_FBO
 #----------------------------------
 #
 # Uncomment below to use Programmable Pipeline rendering using Vertex Buffer Objects and shaders + geometry shader + FBOs + post processing filtering effects
-#---------------------------------- 
-#RENDER_METHOD = PPFBOF
+#----------------------------------
+#RENDER_METHOD = -DRENDER_PP_FBOF
 #----------------------------------
 #
 # Uncomment for previewer DEBUG mode
-#---------------------------------- 
+#----------------------------------
  PREVIEWER_DEBUG = -DDEBUG_MODE=1
-#---------------------------------- 
+#----------------------------------
 
 ifeq (PREVIEWER,$(findstring PREVIEWER,$(OPT)))
 # Link libs
 
 #ifeq ($SYSTYPE,"mac")
- LIB_OPT += -L/usr/X11R6/lib -lXext -lX11 -lGL
+ LIB_OPT += -L/usr/X11/lib -lXext -lX11 -lGL
 #else
 # LIB_OPT += -lGL -lXext -lX11
 #endif
@@ -324,42 +437,22 @@ ifeq (PREVIEWER,$(findstring PREVIEWER,$(OPT)))
 # To add a renderer, copy the if clause below and replace the object file and include file with your own
 # The RENDER_MODE *must* be the exact, case dependant, name of your renderer class.
 # Then add a render_method choice above
-ifeq ($(RENDER_METHOD),FFSVBO)
-
-OBJS_BUILD_SPECIFIC = previewer/libs/renderers/FF_VBO.o 
-CURRENT_RENDERER_INCLUDE = \#include \"FF_VBO.h\"
-
-RENDER_METHOD = -DRENDER_MODE=FF_VBO
-
+ifeq ($(RENDER_METHOD),-DRENDER_FF_VBO)
+	OBJS_BUILD_SPECIFIC = previewer/libs/renderers/FF_VBO.o
 endif
 
-ifeq ($(RENDER_METHOD),PPGEOM)
-
-OBJS_BUILD_SPECIFIC = previewer/libs/renderers/PP_GEOM.o previewer/libs/materials/PP_ParticleMaterial.o previewer/libs/core/Shader.o
-CURRENT_RENDERER_INCLUDE = \#include \"PP_GEOM.h\"
-
-RENDER_METHOD = -DRENDER_MODE=PP_GEOM
-
+ifeq ($(RENDER_METHOD),-DRENDER_PP_GEOM)
+	OBJS_BUILD_SPECIFIC = previewer/libs/renderers/PP_GEOM.o previewer/libs/materials/PP_ParticleMaterial.o previewer/libs/core/Shader.o
 endif
 
-ifeq ($(RENDER_METHOD),PPFBO)
-
-OBJS_BUILD_SPECIFIC = previewer/libs/renderers/PP_FBO.o previewer/libs/materials/PP_ParticleMaterial.o previewer/libs/core/Shader.o \
+ifeq ($(RENDER_METHOD),-DRENDER_PP_FBO)
+	OBJS_BUILD_SPECIFIC = previewer/libs/renderers/PP_FBO.o previewer/libs/materials/PP_ParticleMaterial.o previewer/libs/core/Shader.o \
             previewer/libs/core/Fbo.o
-CURRENT_RENDERER_INCLUDE = \#include \"PP_FBO.h\"
-
-RENDER_METHOD = -DRENDER_MODE=PP_FBO
-
 endif
 
-ifeq ($(RENDER_METHOD),PPFBOF)
-
-OBJS_BUILD_SPECIFIC = previewer/libs/renderers/PP_FBOF.o previewer/libs/materials/PP_ParticleMaterial.o previewer/libs/core/Shader.o \
+ifeq ($(RENDER_METHOD),-DRENDER_PP_FBOF)
+	OBJS_BUILD_SPECIFIC = previewer/libs/renderers/PP_FBOF.o previewer/libs/materials/PP_ParticleMaterial.o previewer/libs/core/Shader.o \
             previewer/libs/core/Fbo.o
-CURRENT_RENDERER_INCLUDE = \#include \"PP_FBOF.h\"
-
-RENDER_METHOD = -DRENDER_MODE=PP_FBOF
-
 endif
 
 
@@ -374,9 +467,13 @@ OBJS +=   previewer/Previewer.o previewer/libs/core/Parameter.o previewer/libs/c
           previewer/libs/animation/AnimationData.o previewer/libs/animation/AnimationPath.o \
           previewer/simple_gui/GUIWindow.o previewer/simple_gui/SimpleGUI.o previewer/simple_gui/GUICommand.o
 
-OBJS += $(OBJS_BUILD_SPECIFIC) 
+OBJS += $(OBJS_BUILD_SPECIFIC)
 
-PREVIEWER_OPTS = $(RENDER_METHOD) $(PREVIEWER_DEBUG)         
+PREVIEWER_OPTS = $(RENDER_METHOD) $(PREVIEWER_DEBUG)
+
+##################################################
+#        END OF PREVIEWER SECTION
+##################################################
 
 endif
 
@@ -384,7 +481,7 @@ INCL   = */*.h Makefile
 
 CPPFLAGS = $(OPTIONS) $(SUP_INCL) $(HDF5_INCL) $(OMP) $(PREVIEWER_OPTS)
 
-CUFLAGS = $(OPTIONS) $(SUP_INCL)
+CUFLAGS = $(OPTIONS) $(SUP_INCL) $(OMP)
 
 LIBS   = $(LIB_OPT) $(OMP)
 
@@ -397,22 +494,27 @@ LIBS   = $(LIB_OPT) $(OMP)
 	$(CC) -c $(CPPFLAGS) -o "$@" "$<"
 
 .cpp.o:
-	@echo "$(CURRENT_RENDERER_INCLUDE)" > previewer/libs/renderers/CurrentRenderer.h
 	$(CC) -c $(CPPFLAGS) -o "$@" "$<"
 
 .cu.o:
-	$(NVCC) -c --compiler-options "$(CUFLAGS)" -o "$@" "$<"
+	$(NVCC) $(NVCCFLAGS) -c --compiler-options "$(CUFLAGS)" -o "$@" "$<"
 
-$(EXEC): $(OBJS)
-	$(CC) $(OPTIONS) $(OBJS) $(LIBS) $(RLIBS) -o $(EXEC) $(LIB_MPIIO) $(LIB_HDF5)
+$(EXEC): $(OBJS) $(CULINK)
+	$(CC) $(OPTIONS) $(OBJS) $(CULINK) $(LIBS) $(RLIBS) -o $(EXEC) $(LIB_MPIIO) $(LIB_HDF5)
 
 $(EXEC1): $(OBJS1) $(OBJSC)
 	$(CC) $(OPTIONS) $(OBJS1) $(OBJSC) $(LIBS) -o $(EXEC1) $(LIB_HDF5)
 
 $(OBJS): $(INCL)
 
+# In order to do "seperate compilation" for CUDA (CUDA >= 5) and also
+# use the host linker for the final link step as opposed to nvcc we must
+# add an intermediary step for nvcc (-arch=sm_30) dont forget -dc compile flag
+$(CULINK):  $(OBJS) $(INCL)
+	$(NVCC) $(NVCCARCH) -dlink $(OBJS) -o $(CULINK)
+
 clean:
-	rm -f $(OBJS)
+	rm -f $(OBJS) $(CULINK)
 
 cleangalaxy:
 	rm -f $(OBJS1)
