@@ -61,9 +61,10 @@ void h5part_reader_prep (paramfile &params, hid_t * inp, arr<int> &qty_idx,
 
   hid_t dataset_space, nrank;
 
+  // TIM: added H5P_DEFAULT as argument to all calls of H5Fopen and H5Dopen as old method is deprecated in hdf
   file_id = H5Fopen(datafile.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
   *inp = file_id;
-  dataset_id = H5Dopen(file_id,field[use_field].c_str());
+  dataset_id = H5Dopen(file_id,field[use_field].c_str(),H5P_DEFAULT);
   dataset_space = H5Dget_space(dataset_id);
   nrank = H5Sget_simple_extent_ndims(dataset_space);
   cout << "SPACE DIM = " << nrank << endl;
@@ -211,7 +212,7 @@ void h5part_reader (paramfile &params, vector<particle_sim> &points)
 //NOW HDF READ STUFF
 
 // set the hyperslab to be read
-  dataset_id = H5Dopen(file_id,field[qty].c_str());
+  dataset_id = H5Dopen(file_id,field[qty].c_str(),H5P_DEFAULT);
   dataset_space = H5Dget_space(dataset_id);  
   H5Sselect_hyperslab(dataset_space, H5S_SELECT_SET, start, NULL, count, NULL); 
 // prepare the memory space

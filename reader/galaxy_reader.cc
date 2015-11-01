@@ -54,7 +54,7 @@ void hdf5_reader_prep (paramfile &params, hid_t * inp, int64 &npart, int64 * sta
   file_id = H5Fopen(datafile.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
   *inp = file_id;
 
-  dataset_id = H5Dopen(file_id,field[0].c_str());
+  dataset_id = H5Dopen(file_id,field[0].c_str(),H5P_DEFAULT);
   dataset_space = H5Dget_space(dataset_id);
   nrank = H5Sget_simple_extent_ndims(dataset_space);
   hsize_t * s_dims    = new hsize_t [nrank];
@@ -174,7 +174,7 @@ void galaxy_reader (paramfile &params, vector<particle_sim> &points)
      if(qty_idx[i] >= 0)
      {
       cout << "working on " << i << endl;
-      dataset_id = H5Dopen(file_id,field[i].c_str());
+      dataset_id = H5Dopen(file_id,field[i].c_str(),H5P_DEFAULT);
       dataset_space = H5Dget_space(dataset_id);
       H5Sselect_hyperslab(dataset_space, H5S_SELECT_SET, start, stride, count, block);
       memoryspace = H5Screate_simple(rank, count, count);

@@ -77,8 +77,8 @@ void tipsy_reader (paramfile &params, vector<particle_sim> &points)
 
   if (mpiMgr.master())
   cout << "File containing "
-       << nbodies << " particles\n " 
-       << ndim << " dim\n " 
+       << nbodies << " particles\n "
+       << ndim << " dim\n "
        << np_species[0] << " gas\n "
        << np_species[1] << " DM\n "
        << np_species[2] << " stars\n "
@@ -86,17 +86,16 @@ void tipsy_reader (paramfile &params, vector<particle_sim> &points)
 
 // Divide work between processors
 
-  long * npar_species; 
-  long * nstart_species; 
-  npar_species = new long[nspecies]; 
-  nstart_species = new long[nspecies]; 
+  long * npar_species;
+  long * nstart_species;
+  npar_species = new long[nspecies];
+  nstart_species = new long[nspecies];
   int64 mybegin, myend;
-  long npart_par=0;
-  
+
 
 // Check which and how many particles to visualize
-  
-  long npart = 0; 
+
+  long npart = 0;
   for(int itype=0;itype<ptypes;itype++)
   {
      int type = params.find<int>("ptype"+dataToString(itype),0);
@@ -112,7 +111,7 @@ void tipsy_reader (paramfile &params, vector<particle_sim> &points)
      npart += npar_species[np_active[itype]];
   }
 
-  
+
 // allocate main vector
   cout << "npart = " << npart << "\n";
   points.resize(npart);
@@ -133,7 +132,7 @@ void tipsy_reader (paramfile &params, vector<particle_sim> &points)
       qty_idx[7] = params.find<int>("C3_"+dataToString(itype),-1)-1;
       float size_fac = params.find<float>("size_fac"+dataToString(itype),1.0);
 
-      switch (np_active[itype]) 
+      switch (np_active[itype])
       {
         case 0:
           nfields = 12;
@@ -147,9 +146,11 @@ void tipsy_reader (paramfile &params, vector<particle_sim> &points)
           nfields = 11;
           skipbytes = (np_species[0]*12+np_species[1]*9+nstart_species[2]*11)*sizeof(float);
           break;
-      }           
+        default:
+          planck_fail("must not arrive here");
+      }
       buffer.resize(nfields);
-      
+
 
       bool have_c2c3 = (qty_idx[6]>=0) && (qty_idx[7]>=0);
       inp.seekg(headersize+skipbytes);
@@ -159,7 +160,7 @@ void tipsy_reader (paramfile &params, vector<particle_sim> &points)
          points[ipart].x = buffer[qty_idx[0]];
          points[ipart].y = buffer[qty_idx[1]];
          points[ipart].z = buffer[qty_idx[2]];
-         points[ipart].r = (qty_idx[3]>=0) ? size_fac*buffer[qty_idx[3]] : smooth_factor;
+         points[ipart].r = (qty_idx[3]>=0) ? size_fac*buffer[qty_idx[3]] : size_fac*smooth_factor;
          points[ipart].I = (qty_idx[4]>=0) ? buffer[qty_idx[4]] : 0.5;
          points[ipart].e.r = (qty_idx[5]>=0) ? buffer[qty_idx[5]] : 1.0;
          points[ipart].e.g = have_c2c3 ? buffer[qty_idx[6]] : 0.0;
@@ -173,5 +174,5 @@ void tipsy_reader (paramfile &params, vector<particle_sim> &points)
       }
   }
   inp.close();
-  
+
 }

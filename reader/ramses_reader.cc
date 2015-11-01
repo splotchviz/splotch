@@ -47,9 +47,11 @@
 
 void ramses_reader(paramfile &params, std::vector<particle_sim> &points)
 {
-	// Check parameter for read mode, points/amr/both
+	// Check parameter for read mode, 0:amr 1:points 2:both
 	int mode = params.find<int>("read_mode",0);
 
+	// Parallel mode = 0 means cpu per file (good for generally small files)
+	// Parallel mode = 1 means multiple cpus per file (good for generally large files)
 	int parallelmode = params.find<int>("parallel_read_mode",0);
 	if(parallelmode != 0 && parallelmode != 1)
 		std::cout << "Incorrect parallel_read_mode setting. Set to 0 or 1." << std::endl;
@@ -227,7 +229,6 @@ void ramses_reader(paramfile &params, std::vector<particle_sim> &points)
 			}
 		}
 
-
 		for(unsigned icpu = firstread; icpu < (firstread+readsthistask); icpu++)
 		{
 			// Open hydro file and read metadata
@@ -281,7 +282,6 @@ void ramses_reader(paramfile &params, std::vector<particle_sim> &points)
 				amr.file.SkipRecords(4);
 
 			// Storage
-			// Not using vectors to avoid performance hit of initialisations on resize
 			double* gridvars = 0;
 			F90_Arr2D<double> gridcoords;
 			F90_Arr3D<double> gridcellhydro;
@@ -434,6 +434,7 @@ void ramses_reader(paramfile &params, std::vector<particle_sim> &points)
 					// Start reading hydro data
 					hydro.file.SkipRecords(2);
 
+
 					// If this task is allocated grids to read
 					if(gridsthistask > 0)
 					{
@@ -463,14 +464,18 @@ void ramses_reader(paramfile &params, std::vector<particle_sim> &points)
 										iy = (icell - (4*iz))/2;
 										ix = icell - (2*iy) - (4*iz);
 										// Calculate absolute coordinates + jitter, and generate particle
-										// randomize location within cell using same method as io_ramses.f90:
-										// call ranf(localseed,xx)
-                                        // xp(pc,l)=xx*boxlen*dx+xc(l)-boxlen*dx/2
-                                        // float r = (float)rand()/(float)RAND_MAX;
+										// randomize location within cell using same method as io_ramses.f90.
+                                        // Out of the three sections of this equation, the first and last are for the random 
+                                        // distribution within the cell, the middle section is for the calculation of the point within the cell. 
+                                        // For the middle section you take original point (gridcoord(igrid,x) and offset it for one of the cells within the oct ( + double(ix)-0.5)
+                                        // Then multiply by dx to scale for the resolution at this specific level, and by boxlen to scale to the resolution of the final box
+                                        // Optionally * scale3d to scale up further (used for previewer, otherwise is set to 1) 
+                                        // The distribution allows for the position to be randomly placed on scale -(dx/2) to +(dx/2)
 										particle_sim p;
-										p.x = ((((float)rand()/(float)RAND_MAX) * amr.meta.boxlen * dx) +(amr.meta.boxlen * (gridcoords(igrid,0) + (double(ix)-0.5) * dx )) - (amr.meta.boxlen*dx/2)) * scale3d;
-										p.y = ((((float)rand()/(float)RAND_MAX) * amr.meta.boxlen * dx) +(amr.meta.boxlen * (gridcoords(igrid,1) + (double(iy)-0.5) * dx )) - (amr.meta.boxlen*dx/2)) * scale3d;
-										p.z = ((((float)rand()/(float)RAND_MAX) * amr.meta.boxlen * dx) +(amr.meta.boxlen * (gridcoords(igrid,2) + (double(iz)-0.5) * dx )) - (amr.meta.boxlen*dx/2)) * scale3d;
+																										  //xc(1)=boxlen*(xxdp(i,1)+(dble(ix)-0.5D0)*dx-xbound(1))
+										p.x = ((((float)rand()/(float)RAND_MAX) * amr.meta.boxlen * dx) +(amr.meta.boxlen * (gridcoords(igrid,0) + (double(ix)-0.5) * dx - amr.meta.xbound[0])) - (amr.meta.boxlen*dx/2)) * scale3d;
+										p.y = ((((float)rand()/(float)RAND_MAX) * amr.meta.boxlen * dx) +(amr.meta.boxlen * (gridcoords(igrid,1) + (double(iy)-0.5) * dx - amr.meta.xbound[1])) - (amr.meta.boxlen*dx/2)) * scale3d;
+										p.z = ((((float)rand()/(float)RAND_MAX) * amr.meta.boxlen * dx) +(amr.meta.boxlen * (gridcoords(igrid,2) + (double(iz)-0.5) * dx - amr.meta.xbound[2])) - (amr.meta.boxlen*dx/2)) * scale3d;
 										// Smoothing length set by box resolution
 										// Can be scaled via scale3d if box has been scaled up
 										// Can be modified with multiplicative factor smooth_factor
@@ -500,6 +505,8 @@ void ramses_reader(paramfile &params, std::vector<particle_sim> &points)
 					else if(ngridfile(idomain,ilevel) > 0 && gridsthistask == 0 && parallelmode == 1)
 						hydro.file.SkipRecords(hydro.meta.nvar*amr.meta.twotondim);
 
+
+
 					// Sampling
 					if(doSample)
 					{
@@ -511,6 +518,8 @@ void ramses_reader(paramfile &params, std::vector<particle_sim> &points)
 
 				} // End loop over domains
 			} // End loop over levels
+			std::cout << "Read file " << icpu << "\r";
+			std::cout.flush();
 		} // End loop over files
 
 		if(mpiMgr.master())
@@ -700,33 +709,36 @@ void ramses_reader(paramfile &params, std::vector<particle_sim> &points)
 			}
 
 			// Read positions
+			// Centre computation box around 0
+			float half_boxlen = info.boxlen/2;
+
 			if(dType=='f')
 			{
 				part.file.Read1DArray(fstorage, firstpart, partsthistask);
 				for(unsigned i = 0; i < pointfilter.size(); i++)
-					pointfilter[i].x = fstorage[i] * scale3d;
+					pointfilter[i].x = (fstorage[i] - half_boxlen) * scale3d;
 
 				part.file.Read1DArray(fstorage, firstpart, partsthistask);
 				for(unsigned i = 0; i < pointfilter.size(); i++)
-					pointfilter[i].y = fstorage[i] * scale3d;
+					pointfilter[i].y = (fstorage[i] - half_boxlen) * scale3d;
 
 				part.file.Read1DArray(fstorage, firstpart, partsthistask);
 				for(unsigned i = 0; i < pointfilter.size(); i++)
-					pointfilter[i].z = fstorage[i] * scale3d;
+					pointfilter[i].z = (fstorage[i] - half_boxlen) * scale3d;
 			}
 			else
 			{
 				part.file.Read1DArray(dstorage, firstpart, partsthistask);
 				for(unsigned i = 0; i < pointfilter.size(); i++)
-					pointfilter[i].x = dstorage[i] * scale3d;
+					pointfilter[i].x = (dstorage[i] - half_boxlen) * scale3d;
 
 				part.file.Read1DArray(dstorage, firstpart, partsthistask);
 				for(unsigned i = 0; i < pointfilter.size(); i++)
-					pointfilter[i].y = dstorage[i] * scale3d;
+					pointfilter[i].y = (dstorage[i] - half_boxlen) * scale3d;
 
 				part.file.Read1DArray(dstorage, firstpart, partsthistask);
 				for(unsigned i = 0; i < pointfilter.size(); i++)
-					pointfilter[i].z = dstorage[i] * scale3d;
+					pointfilter[i].z = (dstorage[i] - half_boxlen) * scale3d;
 			}
 
 			// Read appropriate data

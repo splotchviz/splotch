@@ -45,8 +45,13 @@ long bin_reader_block_mpi (paramfile &params, std::vector<particle_sim> &points,
 void mesh_reader(paramfile &params, std::vector<particle_sim> &points);
 void hdf5_reader(paramfile &params, std::vector<particle_sim> &points);
 void tipsy_reader(paramfile &params, std::vector<particle_sim> &points);
-void galaxy_reader(paramfile &params, std::vector<particle_sim> &points);
-void h5part_reader(paramfile &params, std::vector<particle_sim> &points);
 void ramses_reader(paramfile &params, std::vector<particle_sim> &points);
 long enzo_reader (paramfile &params, std::vector<particle_sim> &points);
+void bonsai_reader (paramfile &params, std::vector<particle_sim> &points);
+void ascii_reader(paramfile &params, std::vector<particle_sim> &points);
+
+// Readers currently inactive
+//void galaxy_reader(paramfile &params, std::vector<particle_sim> &points);
+//void h5part_reader(paramfile &params, std::vector<particle_sim> &points);
+
 #endif

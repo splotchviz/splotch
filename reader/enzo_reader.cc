@@ -18,6 +18,10 @@
  *
  */
 
+ // TIM: Note, all calls to h5fopen and h5dopen added H5_DEFAULT argument as old version of method is deprecated
+ // Also commented out all mesh merger related code until this is in use
+ // 
+
 
 #ifdef HDF5
 #ifdef USE_MPI
@@ -40,9 +44,14 @@
 
 using namespace std;
 
+// For detailed output of data read
+// #define ENZO_VERBOSE
+
+// For debug output while reading
+//#define DEBUG
+
 long enzo_reader (paramfile &params, std::vector<particle_sim> &points)
 {
-
    FILE * pFile;
    FILE * auxFile;
    FILE * hdf5File;
@@ -138,37 +147,37 @@ long enzo_reader (paramfile &params, std::vector<particle_sim> &points)
    fieldsnames[10] = "/Bz";
 
 
-#ifdef MESHMERGER
-   std::vector< vector <float> > colors;
-   std::vector< vector <int> > petiles;
+// #ifdef MESHMERGER
+//    std::vector< vector <float> > colors;
+//    std::vector< vector <int> > petiles;
 
-// define the quantities to be stored in the 
-   int * color = new int [numberoffields];
-   color[0] = params.find<int>("color0",-1);
-   color[1] = params.find<int>("color1",-1);
-   color[2] = params.find<int>("color2",-1);
-   color[3] = params.find<int>("color3",-1);
-   color[4] = params.find<int>("color4",-1);
-   color[5] = params.find<int>("color5",-1);
-   color[6] = params.find<int>("color6",-1);
-   color[7] = params.find<int>("color7",-1);
-   color[8] = params.find<int>("color8",-1);
-   color[9] = params.find<int>("color9",-1);
-   color[10] = params.find<int>("color10",-1);
+// // define the quantities to be stored in the 
+//    int * color = new int [numberoffields];
+//    color[0] = params.find<int>("color0",-1);
+//    color[1] = params.find<int>("color1",-1);
+//    color[2] = params.find<int>("color2",-1);
+//    color[3] = params.find<int>("color3",-1);
+//    color[4] = params.find<int>("color4",-1);
+//    color[5] = params.find<int>("color5",-1);
+//    color[6] = params.find<int>("color6",-1);
+//    color[7] = params.find<int>("color7",-1);
+//    color[8] = params.find<int>("color8",-1);
+//    color[9] = params.find<int>("color9",-1);
+//    color[10] = params.find<int>("color10",-1);
 
-// set the output filename
-   string outfile = params.find<string>("output_file");
+// // set the output filename
+//    string outfile = params.find<string>("output_file");
 
-// create file in parallel
-   MPI_Info info = MPI_INFO_NULL;
-   //MPI_Info_create(&info);
-   //hid_t fapl_id = H5Pcreate(H5P_FILE_ACCESS);
-   hid_t fapl_id = H5Pcreate(H5P_FILE_ACCESS);
-   H5Pset_fapl_mpio(fapl_id, MPI_COMM_WORLD, info);
-   hid_t output_file = H5Fcreate(outfile.c_str(), H5F_ACC_EXCL, H5P_DEFAULT, fapl_id);
-   H5Pclose(fapl_id);
+// // create file in parallel
+//    MPI_Info info = MPI_INFO_NULL;
+//    //MPI_Info_create(&info);
+//    //hid_t fapl_id = H5Pcreate(H5P_FILE_ACCESS);
+//    hid_t fapl_id = H5Pcreate(H5P_FILE_ACCESS);
+//    H5Pset_fapl_mpio(fapl_id, MPI_COMM_WORLD, info);
+//    hid_t output_file = H5Fcreate(outfile.c_str(), H5F_ACC_EXCL, H5P_DEFAULT, fapl_id);
+//    H5Pclose(fapl_id);
 
-#endif
+// #endif
 
    string hierarchyname = params.find<string>("hierarchy_file");
    int sf[numberoffields];
@@ -217,8 +226,8 @@ long enzo_reader (paramfile &params, std::vector<particle_sim> &points)
 
    float fmaxlevel = (float)maxlevel;
    for (int i=0; i<nrank; i++) {
-	boxsize[i] = rightcorner[i] - leftcorner[i];
-	hboxsize[i] = 0.5 * boxsize[i];
+  boxsize[i] = rightcorner[i] - leftcorner[i];
+  hboxsize[i] = 0.5 * boxsize[i];
    }
 
 // calculate virtual global grid size and resolution at the output level
@@ -259,9 +268,9 @@ long enzo_reader (paramfile &params, std::vector<particle_sim> &points)
 // box references in output resolution cells
 
         boxstart_cell[i]  = (int)((boxcoarseL[i]/basesize[i]) * vngx[i]);
-	if(boxstart_cell[i] < 0) boxstart_cell[i] = 0;
+  if(boxstart_cell[i] < 0) boxstart_cell[i] = 0;
         boxend_cell[i]    = (int)((boxcoarseR[i]/basesize[i]) * vngx[i])-1;
-	if(boxend_cell[i] >= vngx[i]) boxend_cell[i] = vngx[i]-1;
+  if(boxend_cell[i] >= vngx[i]) boxend_cell[i] = vngx[i]-1;
         boxcells[i] = boxend_cell[i]-boxstart_cell[i]+1;
 
 // box references in universe (0-1) units
@@ -289,6 +298,9 @@ long enzo_reader (paramfile &params, std::vector<particle_sim> &points)
    hid_t obj_id;
    hid_t dataspace;
    hid_t memoryspace;
+
+   // TIM: Define BCX as default, other defs are for bug in older versions of hdf 
+   #define BCX
 #ifdef SP5
    long long * start = new long long [nrank];
 #endif
@@ -327,6 +339,11 @@ long enzo_reader (paramfile &params, std::vector<particle_sim> &points)
 // build the datasets
 
    pFile = fopen (hierarchyname.c_str(), "r");
+   if(!pFile)
+  {
+    printf("fopen hierarchy file failed\n");
+    exit(1);
+  }
    fscanf (pFile, "%d", &nfiles);
 
 // check if the number of processors is less than the number of files
@@ -361,142 +378,142 @@ long enzo_reader (paramfile &params, std::vector<particle_sim> &points)
    printf("PE %d STARTS FROM %d END AT %d\n", mype, istart_pe, iend_pe);
 #endif
 
-#ifdef MESHMERGER
-// Preprocessing stage
-// calculate total data size
+// #ifdef MESHMERGER
+// // Preprocessing stage
+// // calculate total data size
 
-   long totalsize=0;
-   long distsize=0;
-   for (int i=0; i<nfiles; i++)
-     {
+//    long totalsize=0;
+//    long distsize=0;
+//    for (int i=0; i<nfiles; i++)
+//      {
 
-        for (int j=0; j<nrank; j++) fscanf(pFile, "%d", &lbox[2-j]);
-        for (int j=0; j<nrank; j++) fscanf(pFile, "%d", &rbox[2-j]);
-        for (int j=0; j<nrank; j++) fscanf(pFile, "%lf", &leftside[2-j]);
-        for (int j=0; j<nrank; j++) fscanf(pFile, "%lf", &rightside[2-j]);
-        fscanf (pFile, "%s", datafilename);
-        totalsize += (rbox[2]-lbox[2]+1)*(rbox[1]-lbox[1]+1)*(rbox[0]-lbox[0]+1);
+//         for (int j=0; j<nrank; j++) fscanf(pFile, "%d", &lbox[2-j]);
+//         for (int j=0; j<nrank; j++) fscanf(pFile, "%d", &rbox[2-j]);
+//         for (int j=0; j<nrank; j++) fscanf(pFile, "%lf", &leftside[2-j]);
+//         for (int j=0; j<nrank; j++) fscanf(pFile, "%lf", &rightside[2-j]);
+//         fscanf (pFile, "%s", datafilename);
+//         totalsize += (rbox[2]-lbox[2]+1)*(rbox[1]-lbox[1]+1)*(rbox[0]-lbox[0]+1);
 
-     }
-   fseek (pFile , sizeof(nfiles) , SEEK_SET );
-   distsize = ceil( float(totalsize)/float(npes));
-   //cout << "GLOBAL SIZE = " << totalsize << " " << " AVG SIZE = " << distsize << endl; 
+//      }
+//    fseek (pFile , sizeof(nfiles) , SEEK_SET );
+//    distsize = ceil( float(totalsize)/float(npes));
+//    //cout << "GLOBAL SIZE = " << totalsize << " " << " AVG SIZE = " << distsize << endl; 
 
-// assign tiles to processors to balance the work
+// // assign tiles to processors to balance the work
 
-   petiles.resize(npes);
-   for (int kk=0; kk<npes; kk++)petiles[kk].resize(nfiles);
-   for (int kk=0; kk<npes; kk++)
-     for (int jj=00; jj<nfiles; jj++)petiles[kk][jj]=-1;
+//    petiles.resize(npes);
+//    for (int kk=0; kk<npes; kk++)petiles[kk].resize(nfiles);
+//    for (int kk=0; kk<npes; kk++)
+//      for (int jj=00; jj<nfiles; jj++)petiles[kk][jj]=-1;
 
-   long pesize = 0;
-   long pesizeaux = 0;
-   int ii0 = 0;
-   int jj0 = 0;
-   int totaux = totalsize;
-   for (int i=0; i<nfiles; i++)
-     {
+//    long pesize = 0;
+//    long pesizeaux = 0;
+//    int ii0 = 0;
+//    int jj0 = 0;
+//    int totaux = totalsize;
+//    for (int i=0; i<nfiles; i++)
+//      {
 
-        for (int j=0; j<nrank; j++) fscanf(pFile, "%d", &lbox[2-j]);
-        for (int j=0; j<nrank; j++) fscanf(pFile, "%d", &rbox[2-j]);
-        for (int j=0; j<nrank; j++) fscanf(pFile, "%lf", &leftside[2-j]);
-        for (int j=0; j<nrank; j++) fscanf(pFile, "%lf", &rightside[2-j]);
-        fscanf (pFile, "%s", datafilename);
-        //if(i < istart_pe || i >= iend_pe)continue;
-        //pesize += (rbox[2]-lbox[2]+1)*(rbox[1]-lbox[1]+1)*(rbox[0]-lbox[0]+1);
+//         for (int j=0; j<nrank; j++) fscanf(pFile, "%d", &lbox[2-j]);
+//         for (int j=0; j<nrank; j++) fscanf(pFile, "%d", &rbox[2-j]);
+//         for (int j=0; j<nrank; j++) fscanf(pFile, "%lf", &leftside[2-j]);
+//         for (int j=0; j<nrank; j++) fscanf(pFile, "%lf", &rightside[2-j]);
+//         fscanf (pFile, "%s", datafilename);
+//         //if(i < istart_pe || i >= iend_pe)continue;
+//         //pesize += (rbox[2]-lbox[2]+1)*(rbox[1]-lbox[1]+1)*(rbox[0]-lbox[0]+1);
 
-        pesizeaux += (rbox[2]-lbox[2]+1)*(rbox[1]-lbox[1]+1)*(rbox[0]-lbox[0]+1);
-        if(ii0 == mype)petiles[ii0][jj0] = i;
-        jj0++;
-        if(pesizeaux > distsize || i == nfiles-1)
-          {
-            totaux -= pesizeaux;
-            if(ii0 == mype)pesize=pesizeaux;
-            jj0=0;
-            ii0++;
-            pesizeaux=0;
-            if(i != npes-1)distsize = ceil( float(totaux)/float(npes-ii0));
-          }
-     }
+//         pesizeaux += (rbox[2]-lbox[2]+1)*(rbox[1]-lbox[1]+1)*(rbox[0]-lbox[0]+1);
+//         if(ii0 == mype)petiles[ii0][jj0] = i;
+//         jj0++;
+//         if(pesizeaux > distsize || i == nfiles-1)
+//           {
+//             totaux -= pesizeaux;
+//             if(ii0 == mype)pesize=pesizeaux;
+//             jj0=0;
+//             ii0++;
+//             pesizeaux=0;
+//             if(i != npes-1)distsize = ceil( float(totaux)/float(npes-ii0));
+//           }
+//      }
  
 
-   //for (int kk=0; kk<npes; kk++)
-     //for (int jj=00; jj<nfiles; jj++)cout << kk << " " << mype << " " << petiles[kk][jj] << endl;
+//    //for (int kk=0; kk<npes; kk++)
+//      //for (int jj=00; jj<nfiles; jj++)cout << kk << " " << mype << " " << petiles[kk][jj] << endl;
 
 
-// send to next processor the starting point
-   long * sizearray = new long [npes];
-   long * sizearray_tot = new long [npes];
-   for (int jj=0; jj<npes; jj++)sizearray[jj]=0;
-   for (int jj=0; jj<npes; jj++)sizearray_tot[jj]=0;
-   sizearray[mype] = pesize;
+// // send to next processor the starting point
+//    long * sizearray = new long [npes];
+//    long * sizearray_tot = new long [npes];
+//    for (int jj=0; jj<npes; jj++)sizearray[jj]=0;
+//    for (int jj=0; jj<npes; jj++)sizearray_tot[jj]=0;
+//    sizearray[mype] = pesize;
 
-   MPI_Allreduce(sizearray, sizearray_tot, npes, MPI_LONG, MPI_SUM, MPI_COMM_WORLD);
+//    MPI_Allreduce(sizearray, sizearray_tot, npes, MPI_LONG, MPI_SUM, MPI_COMM_WORLD);
 
-   long startpesize = 0;
-   long endpesize = 0;
-   for (int jj=0; jj<mype; jj++)startpesize += sizearray_tot[jj];
-   endpesize = startpesize+pesize-1;
+//    long startpesize = 0;
+//    long endpesize = 0;
+//    for (int jj=0; jj<mype; jj++)startpesize += sizearray_tot[jj];
+//    endpesize = startpesize+pesize-1;
 
-   cout << "MYPE = " << mype << " LEFT = " << startpesize << " RIGHT = " << pesize << endl;
+//    cout << "MYPE = " << mype << " LEFT = " << startpesize << " RIGHT = " << pesize << endl;
 
-// create the full dataspace
-   hid_t outspace;
-   hid_t * outobj_id = new hid_t [numberoffields+3];
-   int outrank = 1;
-   hsize_t * outdims = new hsize_t [outrank];
-   outdims[0] = totalsize;
-   outspace = H5Screate_simple (outrank, outdims, NULL);
+// // create the full dataspace
+//    hid_t outspace;
+//    hid_t * outobj_id = new hid_t [numberoffields+3];
+//    int outrank = 1;
+//    hsize_t * outdims = new hsize_t [outrank];
+//    outdims[0] = totalsize;
+//    outspace = H5Screate_simple (outrank, outdims, NULL);
 
-// define memspace (chuncks)
-   hid_t memspace;
-   hsize_t * memdim = new hsize_t [outrank];
-   memdim[0] = pesize;
-   memspace = H5Screate_simple(outrank, memdim, NULL);
+// // define memspace (chuncks)
+//    hid_t memspace;
+//    hsize_t * memdim = new hsize_t [outrank];
+//    memdim[0] = pesize;
+//    memspace = H5Screate_simple(outrank, memdim, NULL);
 
-// set the hyperslab
-   hsize_t * pecount = new hsize_t [outrank];
-   hsize_t * peoffset = new hsize_t [outrank];
-   pecount[0] = pesize;
-   peoffset[0] = startpesize;
-   H5Sselect_hyperslab(outspace, H5S_SELECT_SET, peoffset, NULL, pecount, NULL);
+// // set the hyperslab
+//    hsize_t * pecount = new hsize_t [outrank];
+//    hsize_t * peoffset = new hsize_t [outrank];
+//    pecount[0] = pesize;
+//    peoffset[0] = startpesize;
+//    H5Sselect_hyperslab(outspace, H5S_SELECT_SET, peoffset, NULL, pecount, NULL);
 
 
-// create parallel transfer properties 
-   fapl_id = H5Pcreate(H5P_DATASET_XFER);
-   H5Pset_dxpl_mpio(fapl_id, H5FD_MPIO_INDEPENDENT);
+// // create parallel transfer properties 
+//    fapl_id = H5Pcreate(H5P_DATASET_XFER);
+//    H5Pset_dxpl_mpio(fapl_id, H5FD_MPIO_INDEPENDENT);
 
-// create the dataspace for the dataset
-///   hid_t plist_id = H5Pcreate(H5P_DATASET_CREATE);
-///   H5Pset_chunk(plist_id, outrank, pecount);
+// // create the dataspace for the dataset
+// ///   hid_t plist_id = H5Pcreate(H5P_DATASET_CREATE);
+// ///   H5Pset_chunk(plist_id, outrank, pecount);
 
-// create coordinates entry
-   outobj_id[0] = H5Dcreate1(output_file, "coordx", H5T_NATIVE_FLOAT, outspace, H5P_DEFAULT);//, H5P_DEFAULT, H5P_DEFAULT);//, plist_id, H5P_DEFAULT);
-   outobj_id[1] = H5Dcreate1(output_file, "coordy", H5T_NATIVE_FLOAT, outspace, H5P_DEFAULT);//, H5P_DEFAULT, H5P_DEFAULT);//, plist_id, H5P_DEFAULT);
-   outobj_id[2] = H5Dcreate1(output_file, "coordz", H5T_NATIVE_FLOAT, outspace, H5P_DEFAULT);//, H5P_DEFAULT, H5P_DEFAULT);//, plist_id, H5P_DEFAULT);
-   outobj_id[3] = H5Dcreate1(output_file, "resolution", H5T_NATIVE_FLOAT, outspace, H5P_DEFAULT);//, H5P_DEFAULT, H5P_DEFAULT);//, plist_id, H5P_DEFAULT);
+// // create coordinates entry
+//    outobj_id[0] = H5Dcreate1(output_file, "coordx", H5T_NATIVE_FLOAT, outspace, H5P_DEFAULT);//, H5P_DEFAULT, H5P_DEFAULT);//, plist_id, H5P_DEFAULT);
+//    outobj_id[1] = H5Dcreate1(output_file, "coordy", H5T_NATIVE_FLOAT, outspace, H5P_DEFAULT);//, H5P_DEFAULT, H5P_DEFAULT);//, plist_id, H5P_DEFAULT);
+//    outobj_id[2] = H5Dcreate1(output_file, "coordz", H5T_NATIVE_FLOAT, outspace, H5P_DEFAULT);//, H5P_DEFAULT, H5P_DEFAULT);//, plist_id, H5P_DEFAULT);
+//    outobj_id[3] = H5Dcreate1(output_file, "resolution", H5T_NATIVE_FLOAT, outspace, H5P_DEFAULT);//, H5P_DEFAULT, H5P_DEFAULT);//, plist_id, H5P_DEFAULT);
 
-// create fields entry
-   int activefields=0;
-   for (int ifields=0; ifields<numberoffields; ifields++)
-   {
-      if(color[ifields] != -1)
-      {
-        outobj_id[activefields+4] = H5Dcreate1(output_file, fieldsnames[color[ifields]].c_str(), H5T_NATIVE_FLOAT, 
-                                              outspace, H5P_DEFAULT);//, H5P_DEFAULT, H5P_DEFAULT);//, plist_id, H5P_DEFAULT);
-        activefields++;
-      }
-   }
-   colors.resize(activefields+4);
-///   H5Pclose(plist_id);
+// // create fields entry
+//    int activefields=0;
+//    for (int ifields=0; ifields<numberoffields; ifields++)
+//    {
+//       if(color[ifields] != -1)
+//       {
+//         outobj_id[activefields+4] = H5Dcreate1(output_file, fieldsnames[color[ifields]].c_str(), H5T_NATIVE_FLOAT, 
+//                                               outspace, H5P_DEFAULT);//, H5P_DEFAULT, H5P_DEFAULT);//, plist_id, H5P_DEFAULT);
+//         activefields++;
+//       }
+//    }
+//    colors.resize(activefields+4);
+// ///   H5Pclose(plist_id);
 
-   fseek (pFile , sizeof(nfiles) , SEEK_SET );
+//    fseek (pFile , sizeof(nfiles) , SEEK_SET );
      
-// allocate the vectors
-   for (int ii=0; ii<activefields+4; ii++)colors[ii].resize(pesize);
-   for (int ii=0; ii<activefields+4; ii++)colors[ii].resize(pesize);
+// // allocate the vectors
+//    for (int ii=0; ii<activefields+4; ii++)colors[ii].resize(pesize);
+//    for (int ii=0; ii<activefields+4; ii++)colors[ii].resize(pesize);
 
-#endif
+// #endif
 
 //// MAIN LOOP
 
@@ -533,17 +550,17 @@ long enzo_reader (paramfile &params, std::vector<particle_sim> &points)
         //fscanf(pFile, "%d", &gridid);
         for (int j=0; j<nrank; j++) fscanf(pFile, "%d", &lbox[2-j]);
         for (int j=0; j<nrank; j++) fscanf(pFile, "%d", &rbox[2-j]);
-	for (int j=0; j<nrank; j++) fscanf(pFile, "%lf", &leftside[2-j]);
-	for (int j=0; j<nrank; j++) fscanf(pFile, "%lf", &rightside[2-j]);
+  for (int j=0; j<nrank; j++) fscanf(pFile, "%lf", &leftside[2-j]);
+  for (int j=0; j<nrank; j++) fscanf(pFile, "%lf", &rightside[2-j]);
         fscanf (pFile, "%s", datafilename);
 
         for (int j=0; j<nrank; j++)
-	{
+  {
             lbox[j] -= 3;
             rbox[j] -= 3;
-	    sbox[j] = rbox[j]-lbox[j]+1; 
+      sbox[j] = rbox[j]-lbox[j]+1; 
             dxxx[j] = (rightside[j]-leftside[j])/((double)sbox[j]);
-	    rdxxx[j] = 1.0 / dxxx[j];
+      rdxxx[j] = 1.0 / dxxx[j];
  
         }
 // assume same resolution in all directions
@@ -561,26 +578,27 @@ long enzo_reader (paramfile &params, std::vector<particle_sim> &points)
         for(int j=0; j<nrank; j++)if(rightside[j] <= lxbox[j] || leftside[j] >= rxbox[j])checking=1;
 
 #ifdef DEBUG   
-	if(checking)printf("Skipping block %d, not intersecting selected region...\n", i) ;
+  if(checking)printf("Skipping block %d, not intersecting selected region...\n", i) ;
 #endif
-	if(checking)continue;
+  if(checking)continue;
 
 // next iteration if block is not assigned to the processor
 
-        int mycheck=0;
-        for (int jj=0; jj<nfiles; jj++)
-            if(petiles[mype][jj] == i)mycheck=1;
-        if(!mycheck)continue;
+        //int mycheck=0;
+        //for (int jj=0; jj<nfiles; jj++)
+        //    if(petiles[mype][jj] == i)mycheck=1;
+        //if(!mycheck)continue;
 
         //if(i < istart_pe || i >= iend_pe)continue;
-
+#ifdef ENZO_VERBOSE
         printf("BOX = %d, LEVEL = %d\n", i, nlevelbox);
+#endif
         if(nlevelbox > maxlevel) continue;
 
         sourcesize = 1;
         destinationsize = 1;
 
-	for(int j=0; j<nrank; j++) 
+  for(int j=0; j<nrank; j++) 
         {
 
           float raux;
@@ -590,33 +608,33 @@ long enzo_reader (paramfile &params, std::vector<particle_sim> &points)
 
 // intersection region in world coordinates
 
-	  lintersect[j] = (leftside[j] >= lxbox[j])?leftside[j]:lxbox[j]; 
-	  rintersect[j] = (rightside[j] <= rxbox[j])?rightside[j]:rxbox[j]; 
+    lintersect[j] = (leftside[j] >= lxbox[j])?leftside[j]:lxbox[j]; 
+    rintersect[j] = (rightside[j] <= rxbox[j])?rightside[j]:rxbox[j]; 
 
 // intersection region in slab coordinates
 
-	  raux = ((lintersect[j]-leftside[j])*rdxxx[j]);
-	  lnintersect[j] = (int)raux;
+    raux = ((lintersect[j]-leftside[j])*rdxxx[j]);
+    lnintersect[j] = (int)raux;
           raux = ((rintersect[j]-leftside[j])*rdxxx[j])-1;
           rnintersect[j] = (int)raux;
 
 // intersection region in box coordinates
 
-	  float powconv = pow(2.0f, (float)(maxlevel-nlevelbox));
+    float powconv = pow(2.0f, (float)(maxlevel-nlevelbox));
 
-	  raux = ((lintersect[j]-lxbox[j])*rdxvngx[j]);
-	  lbintersect[j] = (int)raux;
+    raux = ((lintersect[j]-lxbox[j])*rdxvngx[j]);
+    lbintersect[j] = (int)raux;
           //////raux = ((rintersect[j]-lxbox[j])*rdxvngx[j])-1;
           raux = lbintersect[j] + (float)(rnintersect[j]-lnintersect[j]+1)*powconv;
-	  rbintersect[j] = (int)raux - 1; 
+    rbintersect[j] = (int)raux - 1; 
 
 // calculate auxiliary read array size
 
           destinationsize *= (long)((float)(rnintersect[j]-lnintersect[j]+1)*powconv);
           sourcesize *= (rnintersect[j]-lnintersect[j]+1);
-	  
+    
 
-	}
+  }
 
 #ifdef DEBUG   
         printf("SOURCESIZE = %ld\n", sourcesize);
@@ -641,16 +659,16 @@ long enzo_reader (paramfile &params, std::vector<particle_sim> &points)
         for (int j=0; j<nrank; j++)
         {
 
-	    start[j]  = (hsize_t)lbintersect[j];
-	    stride[j] = 1;
-	    count[j]  = (hsize_t)(rbintersect[j]-lbintersect[j]+1);
-	    block[j]  = 1;
+      start[j]  = (hsize_t)lbintersect[j];
+      stride[j] = 1;
+      count[j]  = (hsize_t)(rbintersect[j]-lbintersect[j]+1);
+      block[j]  = 1;
 
 
-	    s_start[j]  = (hsize_t)lnintersect[j] ;
-	    s_stride[j] = 1;
-	    s_count[j]  = (hsize_t)(rnintersect[j]-lnintersect[j]+1);
-	    s_block[j]  = 1;
+      s_start[j]  = (hsize_t)lnintersect[j] ;
+      s_stride[j] = 1;
+      s_count[j]  = (hsize_t)(rnintersect[j]-lnintersect[j]+1);
+      s_block[j]  = 1;
 
 #ifdef DEBUG   
             printf ("ORIGIN START %d, ORIGIN COUNT %d\n", s_start[j],s_count[j]);
@@ -668,23 +686,23 @@ long enzo_reader (paramfile &params, std::vector<particle_sim> &points)
 
         total_size_old = total_size;
         total_size += sourcesize;
-
+#ifdef ENZO_VERBOSE
         printf("-----> TOTAL SIZE for PE %d IS %ld\n",mype,total_size);
- 
+#endif
 
 // allocate memory for loading data
 
-	dataarray = new float[sourcesize];
+  dataarray = new float[sourcesize];
 
 /*
         scalar->resize(total_size);
-	xpos->resize(total_size);
-	ypos->resize(total_size);
-	zpos->resize(total_size);
+  xpos->resize(total_size);
+  ypos->resize(total_size);
+  zpos->resize(total_size);
         smooth->resize(total_size);
 */
         points.resize(total_size);
-	
+  
 
         for(long jk=0; jk<sourcesize; jk++)dataarray[jk]=0.0;
 
@@ -705,24 +723,26 @@ long enzo_reader (paramfile &params, std::vector<particle_sim> &points)
                points[iaux].y   = lintersect[1] + dxxx[1] * (float)jc3d;
                points[iaux].z   = lintersect[2] + dxxx[2] * (float)kc3d;
                points[iaux].r   = smooth_factor*dxxx[0];
+               points[iaux].type = 0;
                minradius = (minradius <= dxxx[0] ? minradius : dxxx[0]);
                maxradius = (maxradius >= dxxx[0] ? maxradius : dxxx[0]);
 
                jaux++;
-#ifdef MESHMERGER
-               colors[0][xcounter] = points[iaux].x;
-               colors[1][xcounter] = points[iaux].y;
-               colors[2][xcounter] = points[iaux].z;
-               colors[3][xcounter] = smooth[i];
-#endif
+// #ifdef MESHMERGER
+//                colors[0][xcounter] = points[iaux].x;
+//                colors[1][xcounter] = points[iaux].y;
+//                colors[2][xcounter] = points[iaux].z;
+//                colors[3][xcounter] = smooth[i];
+// #endif
                xcounter++;
         }
-	
+  
 
 // open source file 
-
+#ifdef ENZO_VERBOSE
         printf("READING DATA FROM %s\n", datafilename);
-	source_id = H5Fopen(datafilename, H5F_ACC_RDONLY, H5P_DEFAULT);
+#endif
+  source_id = H5Fopen(datafilename, H5F_ACC_RDONLY, H5P_DEFAULT);
 
 // read dataset from SOURCE
 // data are read in the following sequence:
@@ -732,55 +752,56 @@ long enzo_reader (paramfile &params, std::vector<particle_sim> &points)
 // 3 = intensity
 
         int kaux = 0;
-#ifdef MESHMERGER
-        number_of_fields2read = activefields;
-#else
+// #ifdef MESHMERGER
+//         number_of_fields2read = activefields;
+// #else
         number_of_fields2read = 4;
-#endif
-	for(int k=0; k<number_of_fields2read; k++)
-	{
+// #endif
+  for(int k=0; k<number_of_fields2read; k++)
+  {
 
             jaux=0;
             kaux = sf[k];
-#ifdef MESHMERGER
-            ccounter=ccounter0;
-            kaux = color[k];
-#endif
+// #ifdef MESHMERGER
+//             ccounter=ccounter0;
+//             kaux = color[k];
+// #endif
             if(kaux >= 0)
             {
               completename = hgroup;
-	      completename.append(fieldsnames[kaux]);
-
+        completename.append(fieldsnames[kaux]);
+#ifdef ENZO_VERBOSE
               printf("READING %s from Grid %d\n",completename.c_str(),i);
-	      source_obj = H5Dopen(source_id,completename.c_str());
-	      source_space = H5Dget_space(source_obj);
+#endif              
+        source_obj = H5Dopen(source_id,completename.c_str(),H5P_DEFAULT);
+        source_space = H5Dget_space(source_obj);
 
-   	      H5Sget_simple_extent_dims(source_space, s_dims, s_maxdims);
+          H5Sget_simple_extent_dims(source_space, s_dims, s_maxdims);
 #ifdef DEBUG   
-	      printf("%d, %d, %d\n", s_dims[0], s_dims[1], s_dims[2]);
+        printf("%d, %d, %d\n", s_dims[0], s_dims[1], s_dims[2]);
 #endif
 
 // create auxiliary memory space for reading, select region and read
 
               memoryspace = H5Screate_simple (nrank, s_count, s_count);
-	    
-	      H5Sselect_hyperslab(source_space, H5S_SELECT_SET, s_start, s_stride, s_count, s_block);
+      
+        H5Sselect_hyperslab(source_space, H5S_SELECT_SET, s_start, s_stride, s_count, s_block);
 
-	      H5Dread(source_obj, H5T_NATIVE_FLOAT, memoryspace, source_space, H5P_DEFAULT, dataarray);
+        H5Dread(source_obj, H5T_NATIVE_FLOAT, memoryspace, source_space, H5P_DEFAULT, dataarray);
               H5Sclose (memoryspace);
             }
 
-#ifdef MESHMERGER
-// store data in arrays
-            for (long ii=0; ii<sourcesize; ii++)
-            {
-                colors[k+4][ccounter] = dataarray[ii];
-                ccounter++;
-            }
+// #ifdef MESHMERGER
+// // store data in arrays
+//             for (long ii=0; ii<sourcesize; ii++)
+//             {
+//                 colors[k+4][ccounter] = dataarray[ii];
+//                 ccounter++;
+//             }
 
-#endif
+// #endif
 
-#ifndef MESHMERGER
+//#ifndef MESHMERGER
 #define CASEMACRO__(num,str,noval,ss) \
       case num: \
         if (sf[num]>=0) \
@@ -795,66 +816,66 @@ long enzo_reader (paramfile &params, std::vector<particle_sim> &points)
                CASEMACRO__(0,e.r,1.0,1.0)
                CASEMACRO__(1,e.g,0,1.0)
                CASEMACRO__(2,e.b,0,1.0)
-               CASEMACRO__(3,I,1.0,1.0)
-               //CASEMACRO__(3,I,dxxx[0]*dxxx[0]*dxxx[0],1.0)
+               //CASEMACRO__(3,I,1.0,1.0)
+               CASEMACRO__(3,I,dxxx[0]*dxxx[0]*dxxx[0],1.0)
              }
 
-#endif // not MESHMERGER
+//#endif // not MESHMERGER
 // end of loop over fields 
        }
-#ifdef MESHMERGER
-       ccounter0 = ccounter;
-#endif
+// #ifdef MESHMERGER
+//        ccounter0 = ccounter;
+// #endif
         
 // free memory
 
         H5Fclose (source_id);
-	delete [] dataarray;
+  delete [] dataarray;
    }
 
-#ifdef MESHMERGER
+// #ifdef MESHMERGER
 
-// write data in file
+// // write data in file
 
-   //for(int ii=0; ii<10; ii++)
-   //   cout << colors[0][ii] << " " << colors[1][ii] << " " << colors [2][ii] << " " << colors [3][ii] << endl;
+//    //for(int ii=0; ii<10; ii++)
+//    //   cout << colors[0][ii] << " " << colors[1][ii] << " " << colors [2][ii] << " " << colors [3][ii] << endl;
 
-   float * pointsaux = new float [pesize];
+//    float * pointsaux = new float [pesize];
 
 
-// write positions
-   for (long jj=0; jj<pesize; jj++)pointsaux[jj]=colors[0][jj];
-   H5Dwrite(outobj_id[0], H5T_NATIVE_FLOAT, memspace, outspace, fapl_id, pointsaux);
-   //H5Dwrite(outobj_id[0], H5T_NATIVE_FLOAT, memspace, outspace, fapl_id, &colors[0][0]);
-   for (long jj=0; jj<pesize; jj++)pointsaux[jj]=colors[1][jj];
-   H5Dwrite(outobj_id[1], H5T_NATIVE_FLOAT, memspace, outspace, fapl_id, pointsaux);
-   //H5Dwrite(outobj_id[0], H5T_NATIVE_FLOAT, memspace, outspace, fapl_id, &colors[1][0]);
-   for (long jj=0; jj<pesize; jj++)pointsaux[jj]=colors[2][jj];
-   H5Dwrite(outobj_id[2], H5T_NATIVE_FLOAT, memspace, outspace, fapl_id, pointsaux);
-   //H5Dwrite(outobj_id[0], H5T_NATIVE_FLOAT, memspace, outspace, fapl_id, &colors[2][0]);
-   for (long jj=0; jj<pesize; jj++)pointsaux[jj]=colors[3][jj];
-   H5Dwrite(outobj_id[3], H5T_NATIVE_FLOAT, memspace, outspace, fapl_id, pointsaux);
-   //H5Dwrite(outobj_id[0], H5T_NATIVE_FLOAT, memspace, outspace, fapl_id, &colors[2][0]);
+// // write positions
+//    for (long jj=0; jj<pesize; jj++)pointsaux[jj]=colors[0][jj];
+//    H5Dwrite(outobj_id[0], H5T_NATIVE_FLOAT, memspace, outspace, fapl_id, pointsaux);
+//    //H5Dwrite(outobj_id[0], H5T_NATIVE_FLOAT, memspace, outspace, fapl_id, &colors[0][0]);
+//    for (long jj=0; jj<pesize; jj++)pointsaux[jj]=colors[1][jj];
+//    H5Dwrite(outobj_id[1], H5T_NATIVE_FLOAT, memspace, outspace, fapl_id, pointsaux);
+//    //H5Dwrite(outobj_id[0], H5T_NATIVE_FLOAT, memspace, outspace, fapl_id, &colors[1][0]);
+//    for (long jj=0; jj<pesize; jj++)pointsaux[jj]=colors[2][jj];
+//    H5Dwrite(outobj_id[2], H5T_NATIVE_FLOAT, memspace, outspace, fapl_id, pointsaux);
+//    //H5Dwrite(outobj_id[0], H5T_NATIVE_FLOAT, memspace, outspace, fapl_id, &colors[2][0]);
+//    for (long jj=0; jj<pesize; jj++)pointsaux[jj]=colors[3][jj];
+//    H5Dwrite(outobj_id[3], H5T_NATIVE_FLOAT, memspace, outspace, fapl_id, pointsaux);
+//    //H5Dwrite(outobj_id[0], H5T_NATIVE_FLOAT, memspace, outspace, fapl_id, &colors[2][0]);
 
-// write fields
-   for (int ii=0; ii<activefields; ii++)
-     {
-        for (long jj=0; jj<pesize; jj++)pointsaux[jj]=colors[ii+4][jj]; 
-        //H5Dwrite(outobj_id[color[ii]], H5T_NATIVE_FLOAT, memspace, outspace, fapl_id, &colors[ii+3][0]);
-        H5Dwrite(outobj_id[ii+4], H5T_NATIVE_FLOAT, memspace, outspace, fapl_id, pointsaux);
-     }
+// // write fields
+//    for (int ii=0; ii<activefields; ii++)
+//      {
+//         for (long jj=0; jj<pesize; jj++)pointsaux[jj]=colors[ii+4][jj]; 
+//         //H5Dwrite(outobj_id[color[ii]], H5T_NATIVE_FLOAT, memspace, outspace, fapl_id, &colors[ii+3][0]);
+//         H5Dwrite(outobj_id[ii+4], H5T_NATIVE_FLOAT, memspace, outspace, fapl_id, pointsaux);
+//      }
 
-   delete [] pointsaux;
+//    delete [] pointsaux;
 
-// free HDF5 stuff
+// // free HDF5 stuff
 
-   H5Pclose(fapl_id);
-   for (int ii=0; ii<activefields+4; ii++)H5Dclose(outobj_id[ii]);
-   H5Sclose(memspace);
-   H5Sclose(outspace);
-   H5Fclose(output_file);
+//    H5Pclose(fapl_id);
+//    for (int ii=0; ii<activefields+4; ii++)H5Dclose(outobj_id[ii]);
+//    H5Sclose(memspace);
+//    H5Sclose(outspace);
+//    H5Fclose(output_file);
    
-#endif
+// #endif
 
 #ifdef DEBUG   
    //printf("TOTAL NUMBER OF CELLS AT LEVEL 0 = %ld\n", gcounter);
@@ -865,10 +886,10 @@ long enzo_reader (paramfile &params, std::vector<particle_sim> &points)
 
    fclose (pFile);
 
-#ifdef MESHMERGER
-   if(mype == 0)cout << "Data saved in " << outfile.c_str() << endl;
-   exit (21);
-#endif
+// #ifdef MESHMERGER
+//    if(mype == 0)cout << "Data saved in " << outfile.c_str() << endl;
+//    exit (21);
+// #endif
 
    for(long ir=0; ir<total_size; ir++)points[ir].I = points[ir].I*(points[ir].r/minradius);
    //for(long ir=0; ir<total_size; ir++)points[ir].r = points[ir].r*sqrt(points[ir].r/minradius);

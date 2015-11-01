@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2004-2014
- *              Martin Reinecke (1), Klaus Dolag (1)
- *               (1) Max-Planck-Institute for Astrophysics
+ *              Tim Dykes University of Portsmouth
+ *              Claudio Gheller ETH-CSCS
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -33,7 +33,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include "F90_UnformattedIO.h"
-
+#include "cxxsupport/mpi_support.h"
 //----------------------------------------------------------------------------
 // Helper library for reading RAMSES data
 // Tim Dykes
@@ -115,16 +115,20 @@ private:
 		meta.xbound[1] = double(meta.nx[1])/2;
 		meta.xbound[2] = double(meta.nx[2])/2;
 
-		// std::cout << "ncpu: " << meta.ncpu << std::endl;
-		// std::cout << "ndim: " << meta.ndim << std::endl;
-		// std::cout << "nx: " << meta.nx[0] << std::endl;
-		// std::cout << "ny: " << meta.nx[1] << std::endl;
-		// std::cout << "nz: " << meta.nx[2] << std::endl;
-		// std::cout << "nlevelmax: " << meta.nlevelmax << std::endl;
-		// std::cout << "ngridmax: " << meta.ngridmax << std::endl;
-		// std::cout << "nboundary: " << meta.nboundary << std::endl;
-		// std::cout << "ngridcurrent: " << meta.ngridcurrent << std::endl;
-		// std::cout << "boxlen: " << meta.boxlen << std::endl;
+		if(meta.xbound[0] != meta.xbound[1] || meta.xbound[1] != meta.xbound[2] || meta.xbound[0] != meta.xbound[2])
+			if(mpiMgr.master())
+				std::cout << "Warning: xbounds are not the same! AMR particle calculation may not be correct." << std::endl;
+
+		 // std::cout << "ncpu: " << meta.ncpu << std::endl;
+		 // std::cout << "ndim: " << meta.ndim << std::endl;
+		 // std::cout << "nx: " << meta.nx[0] << std::endl;
+		 // std::cout << "ny: " << meta.nx[1] << std::endl;
+		 // std::cout << "nz: " << meta.nx[2] << std::endl;
+		 // std::cout << "nlevelmax: " << meta.nlevelmax << std::endl;
+		 // std::cout << "ngridmax: " << meta.ngridmax << std::endl;
+		 // std::cout << "nboundary: " << meta.nboundary << std::endl;
+		 // std::cout << "ngridcurrent: " << meta.ngridcurrent << std::endl;
+		 // std::cout << "boxlen: " << meta.boxlen << std::endl;
 	}
 
 	// Fortran file
@@ -302,13 +306,15 @@ public:
 		std::getline(infile, scratch);
 		Read_rhs(scratch, ndim);
 
-		std::getline(infile,scratch);
 		std::getline(infile, scratch);
 		Read_rhs(scratch, levelmin);
 
-		for(int i = 0; i < 6; i++)
+		for(int i = 0; i < 5; i++)
 			std::getline(infile, scratch);
 
+		Read_rhs(scratch, boxlen);
+
+		std::getline(infile, scratch);
 		Read_rhs(scratch, time);
 
 		for(int i = 0; i < 11; i++)
@@ -324,7 +330,8 @@ public:
 		ordering = str.substr(5,str.size()-5);
 		// If ordering is hilbert, read in domain boundaries
 		if(ordering == "hilbert") {
-			std::cout << "Hilbert ordering, reading domains..." << std::endl;
+			if(mpiMgr.master())
+				std::cout << "Hilbert ordering, reading domains..." << std::endl;
 			std::getline(infile, scratch); // skip line
 			// For each line read in domain index  minimum and maximum
 			for(unsigned i = 0; i < ncpu; i++) {
@@ -336,7 +343,8 @@ public:
 				ind_min.push_back(min);
 				ind_max.push_back(max);
 			}
-			std::cout << ncpu << " domain boundaries read" << std::endl;
+			if(mpiMgr.master())
+				std::cout << ncpu << " domain boundaries read" << std::endl;
 		}
 		infile.close();
 	}
@@ -345,6 +353,7 @@ public:
 	unsigned ncpu;// Number of cpus used in simulation
 	unsigned ndim;
 	unsigned levelmin; // Minimum refinement level
+	double boxlen;
 	double time; // Snapshot timestamp
 	std::string ordering;
 	std::vector<double> ind_min; // Minimum domain boundaries for hilbert ordering as listed in info file
