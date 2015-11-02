@@ -444,12 +444,12 @@ void host_rendering (paramfile &params, vector<particle_sim> &particles,
   const vec3 &lookat, const vec3 &sky,
   vector<COLOURMAP> &amap, float b_brightness, tsize npart_all)
   {
-//  if (params.find<bool>("new_renderer", false))
-//    {
-//    host_rendering_new(params, particles, pic, campos, centerpos, lookat, sky,
-//      amap, b_brightness, npart_all);
-//    return;
-//    }
+  if (params.find<bool>("new_renderer", false))
+    {
+    host_rendering_new(params, particles, pic, campos, centerpos, lookat, sky,
+      amap, b_brightness, npart_all);
+    return;
+    }
 
   bool master = mpiMgr.master();
   tsize npart = particles.size();
