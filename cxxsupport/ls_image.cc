@@ -142,6 +142,39 @@ void LS_Image::annotate_centered (int xpos, int ypos, const Colour &col,
 void LS_Image::set_font (const MP_Font &fnt)
   { font = fnt; }
 
+void LS_Image::read_TGA (const string &file)
+  {
+  ifstream in(file.c_str(), ios_base::in | ios_base::binary);
+  planck_assert(in, "could not open file '" + file + "'");
+
+  bistream bi(in);
+  uint8 header[18];
+
+  bi.get (header, 18);
+
+  if( header[16] != 24 || header[17] != 32)
+    {
+    cout << "header of image does not match 24,32 " << header[16] << "," << header[17] << endl;
+    planck_fail(" stop while reading image " + file + " ...");
+    }
+
+  tsize xres=header[12]+256*header[13],
+        yres=header[14]+256*header[15];
+  pixel.alloc(xres,yres);
+
+  vector <uint8> line(3*xres);
+  for (tsize j=0; j<yres; ++j)
+    {
+    bi.get(line.data(),3*xres);
+    for (tsize i=0; i<xres; ++i)
+      {
+      pixel[i][j].b = line[i*3  ];
+      pixel[i][j].g = line[i*3+1];
+      pixel[i][j].r = line[i*3+2];
+      }
+    }
+  }
+
 void LS_Image::write_TGA (const string &file) const
   {
   ofstream out(file.c_str(), ios_base::out | ios_base::binary);

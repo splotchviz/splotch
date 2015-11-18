@@ -49,6 +49,8 @@ void ramses_reader(paramfile &params, std::vector<particle_sim> &points);
 long enzo_reader (paramfile &params, std::vector<particle_sim> &points);
 void bonsai_reader (paramfile &params, std::vector<particle_sim> &points);
 void ascii_reader(paramfile &params, std::vector<particle_sim> &points);
+void fits_reader (paramfile &params, std::vector<particle_sim> &points);
+
 
 // Readers currently inactive
 //void galaxy_reader(paramfile &params, std::vector<particle_sim> &points);

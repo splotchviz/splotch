@@ -223,6 +223,30 @@ int main (int argc, const char **argv)
     int xres = params.find<int>("xres",800),
         yres = params.find<int>("yres",xres);
     arr2<COLOUR> pic(xres,yres);
+
+    bool background = params.find<bool>("background",false);
+    if(background)
+      {
+	if (master)
+	  {
+	    cout << endl << "reading file Background/" << outfile << " ..." << endl;
+	    
+	    LS_Image img;
+	    img.read_TGA("Background/"+outfile+".tga");
+
+#pragma omp parallel for
+	    for (tsize i=0; i<pic.size1(); ++i)
+	      for (tsize j=0; j<pic.size2(); ++j)
+		{
+                  Colour8 c=img.get_pixel(i,j);
+		  pic[i][j].r=c.r/256.0;
+		  pic[i][j].g=c.g/256.0;
+		  pic[i][j].b=c.b/256.0;
+		}
+	  }
+	mpiMgr.bcastRaw(&pic[0][0].r,3*xres*yres);
+      }
+
     tsize npart = particle_data.size();
 
     // Calculate boost factor for brightness

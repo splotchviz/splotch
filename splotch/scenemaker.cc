@@ -933,12 +933,19 @@ void sceneMaker::fetchFiles(vector<particle_sim> &particle_data, double fidx)
     case 13:
       ramses_reader(params,particle_data);
       break;
+#ifdef USE_MPI
     case 14:
       bonsai_reader(params,particle_data);
       break;
+#endif
     case 15:
       ascii_reader(params,particle_data);
       break;
+#ifdef FITS
+    case 16:
+      fits_reader(params,particle_data);
+      break;
+#endif
     }
   mpiMgr.barrier();
   tstack_pop("Reading");

@@ -231,7 +231,7 @@ cout << "maxang = " << maxang << endl;
       { return dp*pi; }
   };
 
-typedef shared_ptr<vector<uint32>> ilsp;
+typedef shared_ptr< vector<uint32> > ilsp;
 
 struct rjob
   {

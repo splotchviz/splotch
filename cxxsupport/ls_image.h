@@ -144,6 +144,9 @@ class LS_Image
         pixel[i][j] : Colour8(0, 0, 0);
       }
 
+    /*! Reads the image from \a file in uncompressed TGA format. */
+    void read_TGA (const std::string &file);
+
     /*! Writes the image to \a file in uncompressed TGA format. */
     void write_TGA (const std::string &file) const;
 
