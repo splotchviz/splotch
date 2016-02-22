@@ -22,6 +22,9 @@ OPT += -DUSE_MPI
 # OPT += -DHDF5
 #OPT += -DH5_USE_16_API
 
+#---------------------------------------- Enable FITSIO
+#OPT += -DFITS
+
 #--------------------------------------- Visual Studio Option
 #OPT += -DVS
 
@@ -368,6 +371,11 @@ ifeq (HDF5,$(findstring HDF5,$(OPT)))
  #OBJS += reader/h5part_reader.o
 endif
 
+ifeq (FITS,$(findstring FITS,$(OPT)))
+ OBJS += reader/fits_reader.o
+ LIB_FITSIO = -lcfitsio
+endif
+
 # OpenCL and CUDA config
 ifeq (OPENCL,$(findstring OPENCL,$(OPT)))
  OBJS += opencl/splotch.o opencl/CuPolicy.o opencl/splotch_cuda2.o opencl/deviceQuery.o
@@ -500,7 +508,7 @@ LIBS   = $(LIB_OPT) $(OMP)
 	$(NVCC) $(NVCCFLAGS) -c --compiler-options "$(CUFLAGS)" -o "$@" "$<"
 
 $(EXEC): $(OBJS) $(CULINK)
-	$(CC) $(OPTIONS) $(OBJS) $(CULINK) $(LIBS) $(RLIBS) -o $(EXEC) $(LIB_MPIIO) $(LIB_HDF5)
+	$(CC) $(OPTIONS) $(OBJS) $(CULINK) $(LIBS) $(RLIBS) -o $(EXEC) $(LIB_MPIIO) $(LIB_HDF5) $(LIB_FITSIO)
 
 $(EXEC1): $(OBJS1) $(OBJSC)
 	$(CC) $(OPTIONS) $(OBJS1) $(OBJSC) $(LIBS) -o $(EXEC1) $(LIB_HDF5)
