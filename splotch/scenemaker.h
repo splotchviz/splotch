@@ -3,6 +3,10 @@
 
 #include <vector>
 #include <string>
+#ifdef WINDOWSCINDER
+#define _USE_MATH_DEFINES
+#include <math.h>
+#endif
 
 #include "cxxsupport/paramfile.h"
 #include "splotch/splotchutils.h"

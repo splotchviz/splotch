@@ -31,6 +31,10 @@
 #include "reader/reader.h"
 #include "booster/mesh_vis.h"
 
+#ifndef M_PI
+#define M_PI           3.14159265358979323846
+#endif
+
 using namespace std;
 
 void sceneMaker::particle_normalize(vector<particle_sim> &p, bool verbose)

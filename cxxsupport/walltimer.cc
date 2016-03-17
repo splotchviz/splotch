@@ -35,7 +35,11 @@
 #include <cmath>
 #include <algorithm>
 #include "walltimer.h"
+#ifdef WINDOWSCINDER
+#include "c_utils\walltime_c.h"
+#else
 #include "walltime_c.h"
+#endif
 #include "error_handling.h"
 #include "mpi_support.h"
 #include "sort_utils.h"
