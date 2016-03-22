@@ -210,3 +210,127 @@ void checkrth(float r_th, int npart, std::vector<particle_sim>& p, paramfile &/*
       }
     }
 }
+
+
+void Camera_Calculator::calculateCameraPosition(BoundingBox box, std::string face, int fov, vec3 &campos, vec3 &lookat, vec3 &sky)
+{
+	int cameraFieldOfView = fov;
+	int faceToUse = GetFaceEnumFromString(face);
+
+  mpiMgr.allreduce(box.maxX,MPI_Manager::Max);
+  mpiMgr.allreduce(box.minX,MPI_Manager::Min);
+  mpiMgr.allreduce(box.maxY,MPI_Manager::Max);
+  mpiMgr.allreduce(box.minY,MPI_Manager::Min);
+  mpiMgr.allreduce(box.maxZ,MPI_Manager::Max);
+  mpiMgr.allreduce(box.minZ,MPI_Manager::Min);
+
+  vec3 centerPoint = vec3((box.maxX + box.minX) / 2, (box.maxY + box.minY) / 2, (box.maxZ + box.minZ) / 2);
+
+	switch (faceToUse)
+	{
+	case FRONT:
+	{
+				  float distanceWidth = (((box.maxX - box.minX) / 2)) / (tan(degreesToRadians(cameraFieldOfView / 2))) + box.maxY;
+				  float distanceHeight = (((box.maxZ - box.minZ) / 2)) / (tan(degreesToRadians(cameraFieldOfView / 2))) + box.maxY;
+
+				  float distanceFromBox = (distanceWidth > distanceHeight) ? distanceWidth : distanceHeight;
+
+				  campos.x = (box.maxX + box.minX) / 2;
+				  campos.y = distanceFromBox;
+				  campos.z = (box.maxZ + box.minZ) / 2;
+
+				  sky = { 0, 0, 1 };
+				  break;
+	}
+
+	case LEFT:
+	{
+				 float distanceWidth = (((box.maxY - box.minY) / 2) / tan(degreesToRadians(cameraFieldOfView / 2))) + box.maxX;
+				 float distanceHeight = (((box.maxZ - box.minZ) / 2) / tan(degreesToRadians(cameraFieldOfView / 2))) + box.maxX;
+
+				 float distanceFromBox = (distanceWidth > distanceHeight) ? distanceWidth : distanceHeight;
+
+				 campos.x = distanceFromBox;
+				 campos.y = (box.maxY + box.minY) / 2;
+				 campos.z = (box.maxZ + box.minZ) / 2;
+
+				 sky = { 0, 0, 1 };
+				 break;
+	}
+
+	case RIGHT:
+	{
+				  float distanceWidth = (((box.maxY - box.minY) / 2) / tan(degreesToRadians(cameraFieldOfView / 2))) + box.maxX;
+				  float distanceHeight = (((box.maxZ - box.minZ) / 2) / tan(degreesToRadians(cameraFieldOfView / 2))) + box.maxX;
+
+				  float distanceFromBox = (distanceWidth > distanceHeight) ? distanceWidth : distanceHeight;
+
+				  campos.x = -distanceFromBox;
+				  campos.y = (box.maxY + box.minY) / 2;
+				  campos.z = (box.maxZ + box.minZ) / 2;
+
+				  sky = { 0, 0, 1 };
+				  break;
+	}
+
+	case BACK:
+	{
+				 float distanceWidth = (((box.maxX - box.minX) / 2) / tan(degreesToRadians(cameraFieldOfView / 2))) + box.maxY;
+				 float distanceHeight = (((box.maxZ - box.minZ) / 2) / tan(degreesToRadians(cameraFieldOfView / 2))) + box.maxY;
+
+				 float distanceFromBox = (distanceWidth > distanceHeight) ? distanceWidth : distanceHeight;
+
+				 campos.x = (box.maxX + box.minX) / 2;
+				 campos.y = -distanceFromBox;
+				 campos.z = (box.maxZ + box.minZ) / 2;
+
+				 sky = { 0, 0, 1 };
+				 break;
+	}
+
+	case TOP:
+	{
+				float distanceWidth = (((box.maxX - box.minX) / 2) / tan(degreesToRadians(cameraFieldOfView / 2))) + box.maxZ;
+				float distanceHeight = (((box.maxY - box.minY) / 2) / tan(degreesToRadians(cameraFieldOfView / 2))) + box.maxZ;
+
+				float distanceFromBox = (distanceWidth > distanceHeight) ? distanceWidth : distanceHeight;
+
+				campos.x = (box.maxX + box.minX) / 2;
+				campos.y = (box.maxY + box.minY) / 2;
+				campos.z = distanceFromBox;
+
+				sky = { 0, 1, 0 };
+				break;
+	}
+
+	case BOTTOM:
+	{
+				   float distanceWidth = (((box.maxX - box.minX) / 2) / tan(degreesToRadians(cameraFieldOfView / 2))) + box.maxZ;
+				   float distanceHeight = (((box.maxY - box.minY) / 2) / tan(degreesToRadians(cameraFieldOfView / 2))) + box.maxZ;
+
+				   float distanceFromBox = (distanceWidth > distanceHeight) ? distanceWidth : distanceHeight;
+
+				   campos.x = (box.maxX + box.minX) / 2;
+				   campos.y = (box.maxY + box.minY) / 2;
+				   campos.z = -distanceFromBox;
+
+				   sky = { 0, 1, 0 };
+				   break;
+	}
+	}
+
+	// Set the look at point for the camera
+  lookat = centerPoint;
+	return;
+}
+
+Face Camera_Calculator::GetFaceEnumFromString(std::string face)
+{
+	if (face == "FRONT"){ return FRONT; }
+	else if (face == "LEFT"){ return LEFT; }
+	else if (face == "RIGHT"){ return RIGHT; }
+	else if (face == "BACK"){ return BACK; }
+	else if (face == "TOP"){ return TOP; }
+	else if (face == "BOTTOM"){ return BOTTOM; }
+	else { return FRONT; };
+}

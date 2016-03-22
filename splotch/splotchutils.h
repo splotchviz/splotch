@@ -81,7 +81,7 @@ struct hcmp
   {
   bool operator()(const particle_sim &p1, const particle_sim &p2) const
     { return p1.r>p2.r; }
-  };
+};
 
 template<typename T> struct Normalizer
   {
@@ -180,7 +180,61 @@ class work_distributor
       iy = n/nx;
       }
   };
+struct BoundingBox
+{
+  float minX=1e30;
+  float minY=1e30;
+  float minZ=1e30;
+  float maxX=-1e30;
+  float maxY=-1e30;
+  float maxZ=-1e30;
 
+	vec3 centerPoint;
+
+	// Compute and store bounding box parameters
+	void Compute(const std::vector<particle_sim>& pData)
+	{
+		arr<Normalizer<float> > minmax(3);
+		for (unsigned i = 0; i < pData.size(); i++)
+		{
+      if (pData[i].e.r > 0.0 || pData[i].e.g > 0.0 || pData[i].e.b > 0.0)
+      {
+			 minmax[0].collect(pData[i].x);
+			 minmax[1].collect(pData[i].y);
+			 minmax[2].collect(pData[i].z);
+      }
+		}
+
+		//Store and display bounding box of data
+		minX = minmax[0].minv;
+		maxX = minmax[0].maxv;
+		minY = minmax[1].minv;
+		maxY = minmax[1].maxv;
+		minZ = minmax[2].minv;
+		maxZ = minmax[2].maxv;
+
+		centerPoint = vec3((maxX + minX) / 2, (maxY + minY) / 2, (maxZ + minZ) / 2);
+	}
+
+};
+
+enum Face : int
+{
+	FRONT,
+	BACK,
+	LEFT,
+	RIGHT,
+	TOP,
+	BOTTOM
+};
+
+class Camera_Calculator
+{
+private:
+	Face GetFaceEnumFromString(std::string face);
+public:
+	void calculateCameraPosition(BoundingBox box, std::string face, int fov, vec3 &campos, vec3 &lookat, vec3 &sky);
+};
 
 void add_colorbar(paramfile &params, arr2<COLOUR> &pic,
   std::vector<COLOURMAP> &amap);

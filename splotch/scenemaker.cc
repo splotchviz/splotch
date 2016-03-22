@@ -1025,19 +1025,43 @@ bool sceneMaker::getNextScene (vector<particle_sim> &particle_data,
   for (map<string,string>::const_iterator it=sceneParameters.begin(); it!=sceneParameters.end(); ++it)
     params.setParam(it->first, it->second);
 
-  // Fetch the values from the param object which may have been altered by the scene file or copied from the opt object.
-  campos=vec3(params.find<double>("camera_x"),params.find<double>("camera_y"),params.find<double>("camera_z"));
-  lookat=vec3(params.find<double>("lookat_x"),params.find<double>("lookat_y"),params.find<double>("lookat_z"));
-  sky   =vec3(params.find<double>("sky_x",0), params.find<double>("sky_y",0), params.find<double>("sky_z",1));
-  if (params.param_present("center_x"))
-    centerpos=vec3(params.find<double>("center_x"),params.find<double>("center_y"),params.find<double>("center_z"));
-  else
-    centerpos=campos;
-
   outfile=scn.outname;
   double fidx=params.find<double>("fidx",0);
 
   fetchFiles(particle_data,fidx);
+
+  //If the camera positions are blank, calculate a suitable one.
+  if (params.find<double>("camera_x", -1) == -1 && params.find<double>("camera_y", -1) == -1 && params.find<double>("camera_z", -1) == -1)
+  {
+    if (mpiMgr.master())
+    {
+      cout << "No camera position supplied. Calculating suitable position" << endl;
+    }
+    string face = params.find<string>("face", "-1");
+    int fov = params.find<int>("fov", 45);
+
+    bbox.Compute(particle_data);
+    camCalc.calculateCameraPosition(bbox, face, fov, campos, lookat, sky);
+    centerpos = campos;
+
+    if (mpiMgr.master())
+    {
+      cout << "Camera position-> x = " << campos.x << ", " << "y = " << campos.y << ", " <<  "z = " << campos.z << endl;
+      cout << "Lookat-> x = " << lookat.x << ", " << "y = " << lookat.y << ", " <<  "z = " << lookat.z << endl;
+    }
+
+  }
+  else
+  {
+	  // Fetch the values from the param object which may have been altered by the scene file or copied from the opt object.
+	  campos = vec3(params.find<double>("camera_x"), params.find<double>("camera_y"), params.find<double>("camera_z"));
+	  lookat = vec3(params.find<double>("lookat_x"), params.find<double>("lookat_y"), params.find<double>("lookat_z"));
+	  sky = vec3(params.find<double>("sky_x", 0), params.find<double>("sky_y", 0), params.find<double>("sky_z", 1));
+	  if (params.param_present("center_x"))
+		  centerpos = vec3(params.find<double>("center_x"), params.find<double>("center_y"), params.find<double>("center_z"));
+	  else
+		  centerpos = campos;
+  }
 
   if (params.find<bool>("periodic",true))
     {

@@ -1,24 +1,3 @@
-/*
- * Copyright (c) 2004-2014
- *              Claudio Gheller ETH-CSCS
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
- */
-
-
 // This reader allows to read only 1D (particles) or 3D (regular grids) datasets
 
 #include <iostream>
@@ -52,21 +31,37 @@ void hdf5_reader_prep (paramfile &params, hid_t * inp, arr<int> &qty_idx,
   float raux;
   string datafile = params.find<string>("infile");
 
+  bool isCom = false;
+  string comParam = params.find<string>("is_compound_data", "-1");
+  if (comParam.compare("TRUE") == 0) isCom = true;
+  string datasetName;
+  if (isCom)
+  {
+    datasetName = params.find<string>("dataset_name");
+    cout << "DATASET NAME = " << datasetName << endl;
+  }
+
   qty_idx.alloc(5);
   raux = params.find<float>("smooth_param",0.0);
 
-    cout << "FIELD NAME -> " << field[0].c_str() << endl; 
+  cout << "FIELD NAME -> " << field[0].c_str() << endl; 
   int use_field = 0;
   if(field[0].compare("-1") == 0)use_field=3;
 
   hid_t dataset_space, nrank;
-
   file_id = H5Fopen(datafile.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
   *inp = file_id;
-  dataset_id = H5Dopen(file_id,field[use_field].c_str(),H5P_DEFAULT);
+  if (isCom)
+  {
+    dataset_id = H5Dopen1(file_id, datasetName.c_str());
+  }
+  else
+  {
+    dataset_id = H5Dopen1(file_id,field[use_field].c_str());
+  }
   dataset_space = H5Dget_space(dataset_id);
   nrank = H5Sget_simple_extent_ndims(dataset_space);
-  //cout << "SPACE DIM = " << nrank << endl;
+  cout << "SPACE DIM = " << nrank << endl;
   *rank = nrank;
   hsize_t * s_dims    = new hsize_t [nrank];
   hsize_t * s_maxdims = new hsize_t [nrank];
@@ -127,6 +122,8 @@ void hdf5_reader_finish (vector<particle_sim> &points, float thresh)
     maxy = max(maxy,points[i].y);
     minz = min(minz,points[i].z);
     maxz = max(maxz,points[i].z);
+
+    //cout << "Points " << i << " x = " << points[i].x << endl << "Points " << i << " y = " << points[i].y << endl << "Points " << i << " z =" << points[i].z << endl;
     }
   mpiMgr.allreduce(maxr,MPI_Manager::Max);
   mpiMgr.allreduce(minr,MPI_Manager::Min);
@@ -137,18 +134,18 @@ void hdf5_reader_finish (vector<particle_sim> &points, float thresh)
   mpiMgr.allreduce(maxz,MPI_Manager::Max);
   mpiMgr.allreduce(minz,MPI_Manager::Min);
 #ifdef DEBUG
-  cout << "MIN, MAX --> " << minr << " " << maxr << endl;
-  cout << "MIN, MAX --> " << minx << " " << maxx << endl;
-  cout << "MIN, MAX --> " << miny << " " << maxy << endl;
-  cout << "MIN, MAX --> " << minz << " " << maxz << endl;
+  cout << "R MIN, MAX --> " << minr << " " << maxr << endl;
+  cout << "X MIN, MAX --> " << minx << " " << maxx << endl;
+  cout << "Y MIN, MAX --> " << miny << " " << maxy << endl;
+  cout << "Z MIN, MAX --> " << minz << " " << maxz << endl;
 #endif
   }
 
 } // unnamed namespace
 
 void hdf5_reader (paramfile &params, vector<particle_sim> &points)
-  {
-hid_t file_id, dataset_id;
+{
+  hid_t file_id, dataset_id;
   float rrr;
   int nfields;
   string * field;
@@ -156,12 +153,15 @@ hid_t file_id, dataset_id;
   int rank;
   int64 mybegin, npart;
   arr<int> qty_idx;
+  int64 particleCount;
+  int snapshotID;
+  vector<int64> snapshotsInFile;
   if (mpiMgr.master())
     cout << "HDF5 DATA" << endl;
 
-  int number_of_fields = 8; 
+  int number_of_fields = 9; 
   field = new string[number_of_fields];
-  
+    
   field[0] = params.find<string>("x", "-1");
   field[1] = params.find<string>("y", "-1");
   field[2] = params.find<string>("z", "-1");
@@ -170,10 +170,15 @@ hid_t file_id, dataset_id;
   field[5] = params.find<string>("C3", "-1");
   field[6] = params.find<string>("r", "-1");
   field[7] = params.find<string>("I", "-1");
+  field[8] = params.find<string>("snapshot", "-1");
   float thresh = params.find<float>("thresh", 0.0);
 
   hdf5_reader_prep (params, &file_id, qty_idx, nfields, npart, &rrr, field, &rank, &start_local);
   hid_t dataset_space;
+  
+  if (field[8].compare("-1") != 0) snapshotID = params.find<int>("snapshotID");
+  else snapshotID = -1;
+  if (mpiMgr.master()) cout << "snapshotID = " << snapshotID << endl;
   hsize_t * start     = new hsize_t [rank];
   hsize_t * stride    = new hsize_t [rank];
   hsize_t * count     = new hsize_t [rank];
@@ -192,41 +197,184 @@ hid_t file_id, dataset_id;
     block[k]  = NULL;
   }
 
-//#ifdef DEBUG
+#ifdef DEBUG
   cout << mpiMgr.rank() << " - - - - " << start[0] << endl;
   cout << mpiMgr.rank() << " npart - - - - " << npart << endl;
   cout << mpiMgr.rank() << " - - - - " << qty_idx[0] << " " << qty_idx[1] << " " << qty_idx[2] << endl;
-//#endif
+#endif
 
   points.resize(npart);
 
-// read fields
+	struct fileData
+	{
+	  float x;
+	  float y;
+	  float z;
+	  float C1;
+	  float C2;
+	  float C3;
+	  float r;
+	  float I;
+	  int snapshot;
+	};
 
-  for (tsize qty=0; qty<number_of_fields; ++qty)
-    {
-    if(field[qty].compare("-1") == 0) continue;
-    float * buffer = new float [npart];
-    cout << "FIELD NAME " << field[qty].c_str() << endl; 
+	bool isCom = false;
+	string comParam = params.find<string>("is_compound_data", "-1");
+	if (comParam.compare("TRUE") == 0) isCom = true;
 
-//NOW HDF READ STUFF
+	if (isCom)
+	{
+		string datasetName;
+		datasetName = params.find<string>("dataset_name");
 
-// set the hyperslab to be read
-  dataset_id = H5Dopen(file_id,field[qty].c_str(),H5P_DEFAULT);
-  dataset_space = H5Dget_space(dataset_id);  
-  H5Sselect_hyperslab(dataset_space, H5S_SELECT_SET, start, NULL, count, NULL); 
-// prepare the memory space
-  hid_t memoryspace = H5Screate_simple(rank, count, count); 
+		fileData * fileDataBuffer;
 
-  H5Dread(dataset_id, H5T_NATIVE_FLOAT, memoryspace, dataset_space, H5P_DEFAULT, buffer);
+		dataset_id = H5Dopen1(file_id, datasetName.c_str());
 
-  H5Dclose(dataset_id);
-  H5Sclose(memoryspace);
-  H5Sclose(dataset_space);
-    
-#define CASEMACRO__(num,str) \
-      case num: \
-        for (int64 i=0; i<npart; ++i) \
-          points[i].str = buffer[i]; \
+		fileDataBuffer = new fileData[npart];
+		hid_t fileData_tid;
+		fileData_tid = H5Tcreate(H5T_COMPOUND, sizeof(fileData));
+
+		dataset_space = H5Dget_space(dataset_id);  
+		H5Sselect_hyperslab(dataset_space, H5S_SELECT_SET, start, NULL, count, NULL); 
+
+		hid_t memoryspace = H5Screate_simple(rank, count, count); 
+
+	    bool printSnaps;
+     	string printSnaps_P = params.find<string>("print_snapIDs_in_file_ONLY", "-1");
+      	if (printSnaps_P.compare("TRUE") == 0) printSnaps = true;
+      	else printSnaps = false;
+
+      	//List and print all the snaps available in the file.
+      	if (printSnaps)
+      	{
+      		H5Tinsert(fileData_tid, field[8].c_str(), HOFFSET(fileData, snapshot), H5T_NATIVE_INT);
+      	}   	
+      	else
+      	{
+          for (tsize qty=0; qty<number_of_fields; ++qty)
+          {
+            if(field[qty].compare("-1") == 0) continue;
+            switch(qty)
+            {
+              case(0):
+                H5Tinsert(fileData_tid, field[0].c_str(), HOFFSET(fileData, x), H5T_NATIVE_FLOAT);
+              break;
+
+              case(1):
+                H5Tinsert(fileData_tid, field[1].c_str(), HOFFSET(fileData, y), H5T_NATIVE_FLOAT);
+              break;
+
+              case(2):
+                H5Tinsert(fileData_tid, field[2].c_str(), HOFFSET(fileData, z), H5T_NATIVE_FLOAT);
+              break;
+
+              case(3):
+                H5Tinsert(fileData_tid, field[3].c_str(), HOFFSET(fileData, C1), H5T_NATIVE_FLOAT);
+              break;
+
+              case(4):
+                H5Tinsert(fileData_tid, field[4].c_str(), HOFFSET(fileData, C2), H5T_NATIVE_FLOAT);
+              break;
+
+              case(5):
+                H5Tinsert(fileData_tid, field[5].c_str(), HOFFSET(fileData, C3), H5T_NATIVE_FLOAT);
+              break;
+
+              case(6):
+                H5Tinsert(fileData_tid, field[6].c_str(), HOFFSET(fileData, r), H5T_NATIVE_FLOAT);
+              break;
+
+              case(7):
+                H5Tinsert(fileData_tid, field[7].c_str(), HOFFSET(fileData, I), H5T_NATIVE_FLOAT);
+              break;
+
+              case(8):
+                H5Tinsert(fileData_tid, field[8].c_str(), HOFFSET(fileData, snapshot), H5T_NATIVE_INT);
+              break;
+            }	
+          }		
+      	}
+
+
+		if (mpiMgr.master()) cout << "Reading file into buffer" << endl;
+		H5Dread(dataset_id, fileData_tid, memoryspace, dataset_space, H5P_DEFAULT, fileDataBuffer);
+		if (mpiMgr.master()) cout << "File read" << endl;
+
+		if (printSnaps)
+		{
+	        for (int64 i = 0; i <npart; ++i)
+	        {
+	          if(std::find(snapshotsInFile.begin(), snapshotsInFile.end(), fileDataBuffer[i].snapshot) != snapshotsInFile.end()) continue;
+	          else snapshotsInFile.push_back(fileDataBuffer[i].snapshot);
+	        }
+	        mpiMgr.barrier();
+	        if (mpiMgr.master()) cout << "TOTAL SNAPSHOTS IN FILE " << snapshotsInFile.size() << endl << "SNAPSHOTS AVAILABLE: " << endl;
+	        std::sort(snapshotsInFile.begin(), snapshotsInFile.end());
+	        for (int i = 0; i <snapshotsInFile.size(); i++) 
+	        {
+	        	if (mpiMgr.master()) cout << "Snapshot: " << snapshotsInFile.at(i) << endl;		
+	        }
+	        planck_assert(false, "Only reading snapshots- Exiting...");
+		}
+	else
+	{
+		if (mpiMgr.master()) cout << "Copying buffer" << endl;
+		particleCount = 0;
+		for (int64 i=0; i<npart; ++i){
+			//cout << fileDataBuffer[i].snapshot;
+			if (snapshotID != -1 && fileDataBuffer[i].snapshot != snapshotID) {continue; }
+			points[particleCount].x = fileDataBuffer[i].x;
+			points[particleCount].y = fileDataBuffer[i].y;
+			points[particleCount].z = fileDataBuffer[i].z;
+			points[particleCount].e.r = fileDataBuffer[i].C1;
+			points[particleCount].e.g = fileDataBuffer[i].C2;
+			points[particleCount].e.b = fileDataBuffer[i].C3;
+			points[particleCount].r = fileDataBuffer[i].r;
+			particleCount++;
+		}
+		points.resize(particleCount + 1);
+
+		if (mpiMgr.master()) cout << "Total particles to render = " << points.size() << endl;
+
+		H5Dvlen_reclaim(fileData_tid, dataset_space, H5P_DEFAULT, fileDataBuffer);
+		free(fileDataBuffer);
+		H5Tclose(fileData_tid);
+		H5Sclose(memoryspace);
+		H5Sclose(dataset_space);
+		H5Dclose(dataset_id);
+	}
+	}
+	else
+	{
+		for (tsize qty=0; qty<number_of_fields; ++qty)
+		{
+			if(field[qty].compare("-1") == 0) continue;
+			float * buffer = new float [npart];
+
+			if (mpiMgr.master()) cout << "READING FIELD: " << field[qty].c_str() << endl; 
+
+			//NOW HDF READ STUFF
+
+			dataset_id = H5Dopen1(file_id,field[qty].c_str());
+
+			dataset_space = H5Dget_space(dataset_id);  
+			H5Sselect_hyperslab(dataset_space, H5S_SELECT_SET, start, NULL, count, NULL); 
+			// prepare the memory space
+			hid_t memoryspace = H5Screate_simple(rank, count, count); 
+
+			H5Dread(dataset_id, H5T_NATIVE_FLOAT, memoryspace, dataset_space, H5P_DEFAULT, buffer);
+
+			H5Sclose(memoryspace);
+			H5Sclose(dataset_space); 
+			H5Dclose(dataset_id);
+		
+	
+
+#define CASEMACRO__(num,str)\
+      case num:\
+        for (int64 i=0; i<npart; ++i){\
+			points[i].str = buffer[i];}\ 
         break;
 
     switch(qty)
@@ -244,7 +392,9 @@ hid_t file_id, dataset_id;
     }
 
 #undef CASEMACRO__
+}
 
+  if (isCom) npart = particleCount;
 //set intensity if not read
   if(field[6].compare("-1") == 0)
     for (int64 i=0; i<npart; ++i) points[i].I=0.5;

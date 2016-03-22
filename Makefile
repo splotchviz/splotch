@@ -57,6 +57,7 @@ SYSTYPE="SuperMuc"
 #SYSTYPE="EIGER"
 #SYSTYPE="TODI"
 #SYSTYPE="DAINT"
+#SYSTYPE="GSTAR"
 
 ### Dommic cluster as CSCS:
 #SYSTYPE="DMC-native"
@@ -335,6 +336,28 @@ ifeq ($(SYSTYPE),"PLX")
   LIB_OPT  =  -L$(CUDA_HOME)/lib64 -L$(CUDA_HOME)/lib -lOpenCL
   SUP_INCL += -I$(CUDA_HOME)/include
  endif
+endif
+
+ifeq ($(SYSTYPE),"GSTAR")
+ ifeq (USE_MPI, $(findstring USE_MPI, $(OPT)))
+  CC = mpic++ #-I/usr/local/x86_64/intel/openmpi-1.8.3/include -pthread
+ else
+  CC = g++
+ endif
+ ifeq (HDF5,$(findstring HDF5,$(OPT)))
+  HDF5_HOME = /usr/local/x86_64/gnu/hdf5-1.8.15
+  LIB_HDF5  = -L$(HDF5_HOME)/lib -lhdf5
+  HDF5_INCL = -I$(HDF5_HOME)/include
+ endif
+ ifeq (CUDA,$(findstring CUDA,$(OPT)))
+ NVCC       =  nvcc
+ CUDA_HOME  =  /usr/local/cuda-7.5
+ LIB_OPT  += -L$(CUDA_HOME)/lib64 -lcudart
+ SUP_INCL += -I$(CUDA_HOME)/include
+ NVCCFLAGS = -g -arch=sm_20 -dc -std=c++11
+
+ endif
+ OMP = -fopenmp
 endif
 
 #-L/home/pavel/NVIDIA_GPU_Computing_SDK/shared/lib

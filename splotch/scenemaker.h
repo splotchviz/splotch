@@ -35,6 +35,8 @@ class sceneMaker
     paramfile &params;
     int interpol_mode;
     double boxsize;
+	Camera_Calculator camCalc;
+	BoundingBox bbox;
 
     // only used if interpol_mode>0
     std::vector<particle_sim> p1, p2;

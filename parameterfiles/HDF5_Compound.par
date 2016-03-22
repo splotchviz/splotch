@@ -1,0 +1,98 @@
+simtype=7
+infile=
+
+ptypes=1
+
+# Use log of color, check splotch output for colour values and modify if necessary
+color_log0=TRUE
+intensity_log0=FALSE
+color_asinh0=FALSE
+
+# If setting red, green and blue components of colour, then set color_is_vector to TRUE
+# If only setting one component of colour, ensure you only set the red component and set color_is_vector to FALSE
+color_is_vector0=FALSE
+#red0=0
+
+intensity_min0=-11.8784
+intensity_max0=-1.44456
+
+color_min0=0.152815
+color_max0=6.29244
+
+hubble=0.7
+lambda=0.7
+omega=0.3
+
+periodic=FALSE
+
+time=0.9999999999999998
+
+AnalyzeSimulationOnly=FALSE
+
+scene_file= #new.scene
+interpolation_mode=0
+
+fidx=1
+EyeSeparation=0
+
+#If all camera options are not included Splotch will calcualte a suitable position based on the face specified.
+#FRONT, BACK, LEFT, RIGHT, TOP, BOTTOM
+face = FRONT
+
+#camera_x=      250.0
+#camera_y=      118.77
+#camera_z=      250.0
+#lookat_x=      250.0
+#lookat_y=      250.0
+#lookat_z=      250.0
+#sky_x=0
+#sky_y=0
+#sky_z=1
+
+
+
+smooth_param=0.15
+
+# 0: TGA uncompressed, 1: PPM ASCII, 2: PPM binary, 3: TGA runlength-compressed
+pictype=0
+outfile=sage_autocamera_front_18
+xres=800
+
+gray_absorption=0.0001
+colorbar=TRUE
+
+palette0=palettes/NewSplotch.pal
+brightness0=1.0
+
+#If this is not specified, will assume false.
+is_compound_data = TRUE
+
+#What dataset within the compound data to read
+dataset_name = galaxies
+
+#If set to true, will read the snapshots contained in the dataset and then exit
+print_snapIDs_in_file_ONLY = false
+
+#Which snapshot to read from the file.
+snapshotID = 12
+
+thresh = 0
+
+#What to use for colour variables. -1 is off.
+C1 = velocity_x
+C2 = -1
+C3 = -1
+
+#Smoothing value and intensity. -1 is off.
+r = -1
+I = -1
+
+#What fields to use for position.
+x = position_x
+y = position_y
+z = position_z
+
+#The name within the dataset that specifies the snapshot
+snapshot = snapshot
+
+gpu_number =1
