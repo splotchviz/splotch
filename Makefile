@@ -1,8 +1,3 @@
-# module for SuperMUC
-#module unload mpi.ibm
-#module load mpi.ibm/1.3_gcc
-#module load gcc/5.1
-
 #######################################################################
 #  Splotch V6                                                      #
 #######################################################################
@@ -49,19 +44,15 @@ OPT += -DUSE_MPI
 SYSTYPE="SuperMuc"
 #SYSTYPE="generic"
 #SYSTYPE="mac"
-#SYSTYPE="SP6"
 #SYSTYPE="GP"
 #SYSTYPE="PLX"
-#SYSTYPE="BGP"
 #SYSTYPE="VIZ"
-#SYSTYPE="EIGER"
-#SYSTYPE="TODI"
 #SYSTYPE="DAINT"
 #SYSTYPE="GSTAR"
 
-### Dommic cluster as CSCS:
-#SYSTYPE="DMC-native"
-#SYSTYPE="DMC-offload"
+### Generic MIC cluster in native and offload modes 
+#SYSTYPE="MIC-native"
+#SYSTYPE="MIC-offload"
 
 ### visualization cluster at the Garching computing center (RZG):
 #SYSTYPE="RZG-SLES11-VIZ"
@@ -148,6 +139,11 @@ ifeq ($(SYSTYPE),"mac")
     endif
 endif
 
+# module for SuperMUC
+#module unload mpi.ibm
+#module load mpi.ibm/1.3_gcc
+#module load gcc/5.1
+
 ifeq ($(SYSTYPE),"SuperMuc")
  ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
   CC       = mpiCC
@@ -176,12 +172,12 @@ ifeq ($(SYSTYPE),"RZG-SLES11-VIZ")
 endif
 
 # Configuration for DOMMIC at CSCS
-ifeq ($(SYSTYPE),"DMC-native")
+ifeq ($(SYSTYPE),"MIC-native")
   CC = icpc -mmic -O2
 #-vec-report6
   OPTIMIZE = -std=c++11 -pedantic -Wfatal-errors -Wextra -Wall -Wstrict-aliasing=2 -Wundef -Wshadow -Wwrite-strings -Woverloaded-virtual -Wcast-qual -Wpointer-arith
 endif
-ifeq ($(SYSTYPE),"DMC-offload")
+ifeq ($(SYSTYPE),"MIC-offload")
   ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
    CC = mpiicpc
   else
@@ -191,28 +187,6 @@ ifeq ($(SYSTYPE),"DMC-offload")
  #-opt-report-phase=offload
  #-vec-report2
  # -guide -parallel
-endif
-
-# configuration for TODI at CSCS
-ifeq ($(SYSTYPE),"TODI")
- ifeq (HDF5,$(findstring HDF5,$(OPT)))
-  HDF5_HOME = /opt/cray/hdf5/1.8.6/gnu/46/
-  LIB_HDF5  = -L$(HDF5_HOME)/lib -lhdf5 -lz
-  HDF5_INCL = -I$(HDF5_HOME)/include
- endif
- ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
-   CC       = CC
- else
-   CC       = g++ -DDEVS_PER_NODE=1
-   #CC       = CC -DDEVS_PER_NODE=1 -DTODI
- endif
-ifeq (CUDA,$(findstring CUDA,$(OPT)))
-NVCC       =  nvcc -g -arch sm_35 -use_fast_math
-LIB_OPT  += -L$(CUDATOOLKIT_HOME)/lib64 -lcudart
-SUP_INCL += -I$(CUDATOOLKIT_HOME)/include
-endif
- OPTIMIZE = -O3
-# OMP      = -fopenmp
 endif
 
 # Configuration for PIZ DAINT at CSCS
@@ -256,45 +230,6 @@ ifeq ($(SYSTYPE),"RZG-SLES11-generic")
 endif
 
 
-ifeq ($(SYSTYPE),"SP6")
- ifeq (HDF5,$(findstring HDF5,$(OPT)))
-  HDF5_HOME = /cineca/prodDF5_INCL = -I$(HDF5_HOME)/include/libraries/hdf5/1.8.4_ser/xl--10.1
-  LIB_HDF5  = -L$(HDF5_HOME)/lib -lhdf5 -L/cineca/prod/libraries/zlib/1.2.3/xl--10.1/lib/ -lz -L/cineca/prod/libraries/szlib/2.1/xl--10.1/lib/ -lsz
- endif
- ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
-  CC       =  mpCC_r
- else
-  CC       =  xlc++
- endif
- OPTIMIZE =  -q64 -O3 -qarch=auto -qtune=auto -qinline
- LIB_OPT	 =  -bstackpsize:64k -bdatapsize:64k -btextpsize:64k
- OMP =
-endif
-
-ifeq ($(SYSTYPE),"EIGER")
-ifeq (HDF5,$(findstring HDF5,$(OPT)))
-HDF5_HOME = /scratch/eiger/cgheller/hdf5-1.8.7/install/
-LIB_HDF5  = -L$(HDF5_HOME)/lib -lhdf5
-HDF5_INCL = -I$(HDF5_HOME)/include
-endif
-ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
-CC       =  mpic++
-else
-CC       =  c++
-endif
-#EIGER again
-ifeq (CUDA,$(findstring CUDA,$(OPT)))
-NVCC       =  nvcc -g
-CUDA_HOME  =  /apps/eiger/Cuda-4.0/cuda
-#LIB_OPT  += -L$(CUDA_HOME)/lib -L$(CUDA_HOME)/lib64 -lcudart
-LIB_OPT  += -L$(CUDA_HOME)/lib64 -lcudart
-SUP_INCL += -I/apps/eiger/NVIDIA_GPU_Computing_SDK/C/common/inc/ -I$(CUDA_HOME)/include#-I$(CUDAUTIL_INC) -I$(NVCC_HOME)/include
-endif
-
-OPTIMIZE =  -O3
-OMP =
-endif
-
 ifeq ($(SYSTYPE),"GP")
  CC       =  nvcc -g
  ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
@@ -306,17 +241,6 @@ ifeq ($(SYSTYPE),"GP")
  OMP =
  #-Xcompiler -openmp
  SUP_INCL += -I$(CUDA_HOME)/sdk/common/inc -I$(CUDA_HOME)/sdk/C/common/inc # -I$(CUDA_HOME)/include  -Icuda
-endif
-
-ifeq ($(SYSTYPE),"BGP")
- ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
-  CC       = mpixlcxx_r
- else
-  CC       = bgxlC_r
- endif
- OPTIMIZE = -O3 -qstrict -qarch=450d -qtune=450 # -qipa=inline
- LIB_OPT  =
- OMP =   -qsmp=omp -qthreaded
 endif
 
 ifeq ($(SYSTYPE),"PLX")
@@ -360,8 +284,6 @@ ifeq ($(SYSTYPE),"GSTAR")
  OMP = -fopenmp
 endif
 
-#-L/home/pavel/NVIDIA_GPU_Computing_SDK/shared/lib
-#
 #--------------------------------------- Here we go
 
 OPTIONS = $(OPTIMIZE) $(OPT)
