@@ -134,7 +134,7 @@ endif
 
 #CUDA_HOME = /usr/local/cuda/
 
-ifeq ($(SYSTYPE),"Linux cluster")
+ifeq ($(SYSTYPE),"Linux-cluster")
   ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
    CC  =  mpiCC -g
   else
