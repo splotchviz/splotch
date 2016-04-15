@@ -42,7 +42,7 @@ OPT += -DUSE_MPI
 #--------------------------------------- Select target Computer
 SYSTYPE="generic"
 #SYSTYPE="mac"
-#SYSTYPE=“Linux cluster”
+#SYSTYPE="Linux-cluster"
 #SYSTYPE="GP"
 #SYSTYPE="DAINT"
 #SYSTYPE="GSTAR"
@@ -134,7 +134,7 @@ endif
 
 #CUDA_HOME = /usr/local/cuda/
 
-ifeq ($(SYSTYPE),”Linux “cluster)
+ifeq ($(SYSTYPE),"Linux cluster")
   ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
    CC  =  mpiCC -g
   else
@@ -143,9 +143,9 @@ ifeq ($(SYSTYPE),”Linux “cluster)
   OPTIMIZE = -O2 -DDEBUG
   OMP = -fopenmp
   ifeq (CUDA,$(findstring CUDA,$(OPT)))
-  NVCC = nvcc -arch sm_20 -use_fast_math
+  NVCC = nvcc -arch sm_30 -use_fast_math
   LIB_OPT  =  -L$(CUDA_HOME)/lib64 -lcudart
-  SUP_INCL += -I$(CUDA_HOME)/include -I$(CUDA_SDK)/CUDALibraries/common/inc
+  SUP_INCL += -I$(CUDA_HOME)/include
   endif
   ifeq (OPENCL,$(findstring OPENCL,$(OPT)))
   LIB_OPT  =  -L$(CUDA_HOME)/lib64 -L$(CUDA_HOME)/lib -lOpenCL
