@@ -43,7 +43,6 @@ OPT += -DUSE_MPI
 SYSTYPE="generic"
 #SYSTYPE="mac"
 #SYSTYPE="Linux-cluster"
-#SYSTYPE="GP"
 #SYSTYPE="DAINT"
 #SYSTYPE="GSTAR"
 #SYSTYPE="SuperMuc"
@@ -155,22 +154,6 @@ ifeq ($(SYSTYPE),"Linux-cluster")
   SUP_INCL += -I$(CUDA_HOME)/include
   endif
 endif
-
-
-ifeq ($(SYSTYPE),"GP")
-  CUDA_HOME = /usr/local/cuda/
-  CC       =  nvcc -g
-  ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
-   CC       =  mpicxx -g -I$(CUDA_HOME)/sdk/common/inc -I$(CUDA_HOME)/sdk/C/common/inc -I$(CUDA_HOME)/include
-  endif
-  NVCC       =  nvcc -g
-  OPTIMIZE = -O2
-  LIB_OPT  =  -L$(CUDA_HOME)/lib -L$(CUDA_HOME)/lib64 -lcudart
-  OMP =
-  #-Xcompiler -openmp
-  SUP_INCL += -I$(CUDA_HOME)/sdk/common/inc -I$(CUDA_HOME)/sdk/C/common/inc # -I$(CUDA_HOME)/include  -Icuda
-endif
-
 
 # Configuration for PIZ DAINT at CSCS
 ifeq ($(SYSTYPE), "DAINT")
