@@ -88,10 +88,11 @@ ifeq ($(SYSTYPE),"generic")
   # Generic 64bit cuda setup
   ifeq (CUDA,$(findstring CUDA,$(OPT)))
   NVCC       =  nvcc
+  NVCCARCH = -arch=sm_30
+  NVCCFLAGS = -g  $(NVCCARCH) -dc
   CUDA_HOME  =  /opt/nvidia/cudatoolkit/default 
   LIB_OPT  += -L$(CUDA_HOME)/lib64 -lcudart
   SUP_INCL += -I$(CUDA_HOME)/include
-  NVCCFLAGS = -g -arch=sm_30 -dc
   endif
 endif
 
@@ -132,18 +133,19 @@ ifeq ($(SYSTYPE),"mac")
 endif
 
 
-#CUDA_HOME = /usr/local/cuda/
-
 ifeq ($(SYSTYPE),"Linux-cluster")
   ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
    CC  =  mpiCC -g
   else
    CC  = g++
   endif
-  OPTIMIZE = -O2 -DDEBUG
+  OPTIMIZE = -O2 
   OMP = -fopenmp
   ifeq (CUDA,$(findstring CUDA,$(OPT)))
-  NVCC = nvcc -arch sm_30 -use_fast_math
+  CUDA_HOME = /usr/local/cuda/
+  NVCC = nvcc
+  NVCCARCH = -arch=sm_30
+  NVCCFLAGS = -g  $(NVCCARCH) -dc -use_fast_math
   LIB_OPT  =  -L$(CUDA_HOME)/lib64 -lcudart
   SUP_INCL += -I$(CUDA_HOME)/include
   endif
@@ -155,6 +157,7 @@ endif
 
 
 ifeq ($(SYSTYPE),"GP")
+  CUDA_HOME = /usr/local/cuda/
   CC       =  nvcc -g
   ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
    CC       =  mpicxx -g -I$(CUDA_HOME)/sdk/common/inc -I$(CUDA_HOME)/sdk/C/common/inc -I$(CUDA_HOME)/include
