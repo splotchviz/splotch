@@ -2,26 +2,22 @@
 #  Splotch V6                                                      #
 #######################################################################
 
-#--------------------------------------- Switch on Previewer
-#OPT += -DPREVIEWER
+#--------------------------------------- Turn off Intensity  normalization
+#OPT += -DNO_I_NORM
 
 #--------------------------------------- Switch on DataSize
 OPT += -DLONGIDS
 
-#--------------------------------------- Switch on MPI
-OPT += -DUSE_MPI
-#OPT += -DUSE_MPIIO
-
 #--------------------------------------- Switch on HDF5
-
-# OPT += -DHDF5
+#OPT += -DHDF5
 #OPT += -DH5_USE_16_API
 
 #---------------------------------------- Enable FITSIO
 #OPT += -DFITS
 
-#--------------------------------------- Visual Studio Option
-#OPT += -DVS
+#--------------------------------------- Switch on MPI
+OPT += -DUSE_MPI
+#OPT += -DUSE_MPIIO
 
 #--------------------------------------- CUDA options
 #OPT += -DCUDA
@@ -31,35 +27,35 @@ OPT += -DUSE_MPI
 #OPT += -DOPENCL
 #OPT += -DNO_WIN_THREAD
 
+#--------------------------------------- MIC options
+#OPT += -DMIC
+
+#--------------------------------------- Switch on Previewer
+#OPT += -DPREVIEWER
+
 #--------------------------------------- Turn on VisIVO stuff
 #OPT += -DSPLVISIVO
 
-#--------------------------------------- Turn off Intensity  normalization
-#OPT += -DNO_I_NORM
-
-#--------------------------------------- MIC options
-# OPT += -DMIC
+#--------------------------------------- Visual Studio Option
+#OPT += -DVS
 
 #--------------------------------------- Select target Computer
-SYSTYPE="SuperMuc"
-#SYSTYPE="generic"
+SYSTYPE="generic"
 #SYSTYPE="mac"
+#SYSTYPE=“Linux cluster”
 #SYSTYPE="GP"
-#SYSTYPE="PLX"
-#SYSTYPE="VIZ"
 #SYSTYPE="DAINT"
 #SYSTYPE="GSTAR"
-
-### Generic MIC cluster in native and offload modes 
-#SYSTYPE="MIC-native"
-#SYSTYPE="MIC-offload"
+SYSTYPE="SuperMuc"
 
 ### visualization cluster at the Garching computing center (RZG):
 #SYSTYPE="RZG-SLES11-VIZ"
 ### generic SLES11 Linux machines at the Garching computing center (RZG):
 #SYSTYPE="RZG-SLES11-generic"
 
-
+### Generic MIC cluster in native and offload modes 
+#SYSTYPE="MIC-native"
+#SYSTYPE="MIC-offload"
 
 
 # Set compiler executables to commonly used names, may be altered below!
@@ -72,37 +68,33 @@ endif
 # OpenMP compiler switch
 OMP      = -fopenmp
 
-
-SUP_INCL = -I. -Icxxsupport -Ic_utils
-
+SUP_INCL = -I. -Icxxsupport -Ic_utils -Ivectorclass
 
 # optimization and warning flags (g++)
-OPTIMIZE =  -pedantic -Wno-long-long -Wfatal-errors -Wextra -Wall -Wstrict-aliasing=2 -Wundef -Wshadow -Wwrite-strings -Wredundant-decls -Woverloaded-virtual -Wcast-qual -Wcast-align -Wpointer-arith -std=c++11
+OPTIMIZE =  -pedantic -Wno-long-long -Wfatal-errors -Wextra -Wall -Wstrict-aliasing=2 -Wundef -Wshadow -Wwrite-strings -Wredundant-decls -Woverloaded-virtual -Wcast-qual -Wcast-align -Wpointer-arith -std=c++11 -march=native
 #-Wno-newline-eof -g
 #-Wold-style-cast -std=c++11
-ifeq ($(SYSTYPE),"generic")
-# OPTIMIZE += -O2 -g -D TWOGALAXIES
- OPTIMIZE += -O2 -g
 
-# Generic 64bit cuda setup
-ifeq (CUDA,$(findstring CUDA,$(OPT)))
-NVCC       =  nvcc
-CUDA_HOME  =  /opt/nvidia/cudatoolkit/default
-LIB_OPT  += -L$(CUDA_HOME)/lib64 -lcudart
-SUP_INCL += -I$(CUDA_HOME)/include
-NVCCFLAGS = -g -arch=sm_30 -dc
-endif
-
-endif
-
-# OpenMP compiler switch
-#OMP      = -fopenmp
-SUP_INCL = -I. -Icxxsupport -Ic_utils
-
-#CUDA_HOME = /usr/local/cuda/
 ifeq (USE_MPIIO,$(findstring USE_MPIIO,$(OPT)))
  SUP_INCL += -Impiio-1.0/include/
+ LIB_MPIIO = -Lmpiio-1.0/lib -lpartition
 endif
+
+
+ifeq ($(SYSTYPE),"generic")
+  # OPTIMIZE += -O2 -g -D TWOGALAXIES
+  OPTIMIZE += -O2 -g
+
+  # Generic 64bit cuda setup
+  ifeq (CUDA,$(findstring CUDA,$(OPT)))
+  NVCC       =  nvcc
+  CUDA_HOME  =  /opt/nvidia/cudatoolkit/default 
+  LIB_OPT  += -L$(CUDA_HOME)/lib64 -lcudart
+  SUP_INCL += -I$(CUDA_HOME)/include
+  NVCCFLAGS = -g -arch=sm_30 -dc
+  endif
+endif
+
 
 # NOTE: This is for osx >=10.9 i.e. clang not gcc
 # Openmp isnt supported by default, so you must modify the paths to point to your
@@ -123,166 +115,172 @@ ifeq ($(SYSTYPE),"mac")
 		NVCCFLAGS = -g -ccbin /Users/tims/Programs/Clang-OpenMP/build/Debug+Asserts/bin/clang++ -arch=sm_30 -dc
 	endif
   endif
-	ifeq (-fopenmp,$(OMP))
-		# Change this as above
-		CC = /Users/tims/Programs/Clang-OpenMP/build/Debug+Asserts/bin/clang++
-		OPTIMIZE = -Wall -stdlib=libstdc++ -Wno-unused-function -Wno-unused-variable -Wno-unused-const-variable
-		# These should point to your include and library folders for an openmp runtime library
-		SUP_INCL += -I/Users/tims/Programs/Intel-OMP-RT/libomp_oss/exports/common/include/
-		LIB_OPT += -L/Users/tims/Programs/Intel-OMP-RT/libomp_oss/exports/mac_32e/lib.thin/
-	endif
-	ifeq (PREVIEWER,$(findstring PREVIEWER,$(OPT)))
-		SUP_INCL += -I/opt/X11/include
-	endif
-    ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
+  ifeq (-fopenmp,$(OMP))
+	# Change this as above
+	CC = /Users/tims/Programs/Clang-OpenMP/build/Debug+Asserts/bin/clang++
+	OPTIMIZE = -Wall -stdlib=libstdc++ -Wno-unused-function -Wno-unused-variable -Wno-unused-const-variable
+	# These should point to your include and library folders for an openmp runtime library
+	SUP_INCL += -I/Users/tims/Programs/Intel-OMP-RT/libomp_oss/exports/common/include/
+	LIB_OPT += -L/Users/tims/Programs/Intel-OMP-RT/libomp_oss/exports/mac_32e/lib.thin/
+  endif
+  ifeq (PREVIEWER,$(findstring PREVIEWER,$(OPT)))
+	SUP_INCL += -I/opt/X11/include
+  endif
+  ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
     	CC = mpic++
-    endif
+  endif
 endif
 
-# module for SuperMUC
-#module unload mpi.ibm
-#module load mpi.ibm/1.3_gcc
-#module load gcc/5.1
+
+#CUDA_HOME = /usr/local/cuda/
+
+ifeq ($(SYSTYPE),”Linux “cluster)
+  ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
+   CC  =  mpiCC -g
+  else
+   CC  = g++
+  endif
+  OPTIMIZE = -O2 -DDEBUG
+  OMP = -fopenmp
+  ifeq (CUDA,$(findstring CUDA,$(OPT)))
+  NVCC = nvcc -arch sm_20 -use_fast_math
+  LIB_OPT  =  -L$(CUDA_HOME)/lib64 -lcudart
+  SUP_INCL += -I$(CUDA_HOME)/include -I$(CUDA_SDK)/CUDALibraries/common/inc
+  endif
+  ifeq (OPENCL,$(findstring OPENCL,$(OPT)))
+  LIB_OPT  =  -L$(CUDA_HOME)/lib64 -L$(CUDA_HOME)/lib -lOpenCL
+  SUP_INCL += -I$(CUDA_HOME)/include
+  endif
+endif
+
+
+ifeq ($(SYSTYPE),"GP")
+  CC       =  nvcc -g
+  ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
+   CC       =  mpicxx -g -I$(CUDA_HOME)/sdk/common/inc -I$(CUDA_HOME)/sdk/C/common/inc -I$(CUDA_HOME)/include
+  endif
+  NVCC       =  nvcc -g
+  OPTIMIZE = -O2
+  LIB_OPT  =  -L$(CUDA_HOME)/lib -L$(CUDA_HOME)/lib64 -lcudart
+  OMP =
+  #-Xcompiler -openmp
+  SUP_INCL += -I$(CUDA_HOME)/sdk/common/inc -I$(CUDA_HOME)/sdk/C/common/inc # -I$(CUDA_HOME)/include  -Icuda
+endif
+
+
+# Configuration for PIZ DAINT at CSCS
+ifeq ($(SYSTYPE), "DAINT")
+  ifeq (CUDA, $(findstring CUDA, $(OPT)))
+  CUDATOOLKIT_HOME=/opt/nvidia/cudatoolkit/5.5.20-1.0501.7945.8.2/
+  NVCC = nvcc
+  NVCCARCH = -arch=sm_30
+  NVCCFLAGS = -g  $(NVCCARCH) -dc -use_fast_math
+  LIB_OPT  += -L$(CUDATOOLKIT_HOME)/lib64 -lcudart
+  SUP_INCL += -I$(CUDATOOLKIT_HOME)/include
+  OPTIMIZE = -O3
+  endif
+  ifeq (HDF5,$(findstring HDF5,$(OPT)))
+  HDF5_HOME = /opt/cray/hdf5-parallel/1.8.13/gnu/48/
+  LIB_HDF5  = -L$(HDF5_HOME)lib -Wl,-rpath,$(HDF5_HOME)/lib -lhdf5 -lz
+  HDF5_INCL = -I$(HDF5_HOME)include
+  endif
+  ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
+	CC = cc
+  endif
+endif
+
+
+ifeq ($(SYSTYPE),"GSTAR")
+  ifeq (USE_MPI, $(findstring USE_MPI, $(OPT)))
+   CC = mpic++ #-I/usr/local/x86_64/intel/openmpi-1.8.3/include -pthread
+  else
+   CC = g++
+  endif
+  ifeq (HDF5,$(findstring HDF5,$(OPT)))
+  HDF5_HOME = /usr/local/x86_64/gnu/hdf5-1.8.15
+  LIB_HDF5  = -L$(HDF5_HOME)/lib -lhdf5
+  HDF5_INCL = -I$(HDF5_HOME)/include
+  endif
+  ifeq (CUDA,$(findstring CUDA,$(OPT)))
+  NVCC       =  nvcc
+  CUDA_HOME  =  /usr/local/cuda-7.5
+  LIB_OPT  += -L$(CUDA_HOME)/lib64 -lcudart
+  SUP_INCL += -I$(CUDA_HOME)/include
+  NVCCFLAGS = -g -arch=sm_20 -dc -std=c++11
+  endif
+  OMP = -fopenmp
+endif
+
 
 ifeq ($(SYSTYPE),"SuperMuc")
- ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
-  CC       = mpiCC
- else
-  CC       = ifc
- endif
- OPTIMIZE = -O3 -g -std=c++11
- OMP =   -fopenmp
+  module unload mpi.ibm
+  module load mpi.ibm/1.3_gcc
+  module load gcc/5.1
+
+  ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
+   CC       = mpiCC
+  else
+   CC       = ifc
+  endif
+  OPTIMIZE = -O3 -g -std=c++11
+  OMP =   -fopenmp
 endif
 
 # Configuration for the VIZ visualization cluster at the Garching computing centre (RZG):
 # ->  gcc/OpenMPI_1.4.2
 ifeq ($(SYSTYPE),"RZG-SLES11-VIZ")
- ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
-  CC       = mpic++
- else
-  CC       = g++
- endif
- ifeq (HDF5,$(findstring HDF5,$(OPT)))
+  ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
+   CC       = mpic++
+  else
+   CC       = g++
+  endif
+  ifeq (HDF5,$(findstring HDF5,$(OPT)))
   HDF5_HOME = /u/system/hdf5/1.8.7/serial
   LIB_HDF5  = -L$(HDF5_HOME)/lib -Wl,-rpath,$(HDF5_HOME)/lib -lhdf5 -lz
   HDF5_INCL = -I$(HDF5_HOME)/include
- endif
- OPTIMIZE += -O3 -march=native -mtune=native
- OMP       = -fopenmp
+  endif
+  OPTIMIZE += -O3 -march=native -mtune=native
+  OMP       = -fopenmp
 endif
 
-# Configuration for DOMMIC at CSCS
+
+# Configuration for SLES11 Linux clusters at the Garching computing centre (RZG):
+# ->  gcc/IntelMPI_4.0.0, requires "module load impi"
+ifeq ($(SYSTYPE),"RZG-SLES11-generic")
+  ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
+   CC       = mpigxx
+  else
+   CC       = g++
+  endif
+  ifeq (HDF5,$(findstring HDF5,$(OPT)))
+  HDF5_HOME = /afs/ipp/home/k/khr/soft/amd64_sles11/opt/hdf5/1.8.7
+  LIB_HDF5  = -L$(HDF5_HOME)/lib -Wl,-rpath,$(HDF5_HOME)/lib -lhdf5 -lz
+  HDF5_INCL = -I$(HDF5_HOME)/include
+  endif
+  OPTIMIZE += -O3 -msse3
+  OMP       = -fopenmp
+endif
+
+
+# Configuration for generic mic cluster
 ifeq ($(SYSTYPE),"MIC-native")
   CC = icpc -mmic -O2
-#-vec-report6
+  #-vec-report6
   OPTIMIZE = -std=c++11 -pedantic -Wfatal-errors -Wextra -Wall -Wstrict-aliasing=2 -Wundef -Wshadow -Wwrite-strings -Woverloaded-virtual -Wcast-qual -Wpointer-arith
 endif
+
 ifeq ($(SYSTYPE),"MIC-offload")
   ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
    CC = mpiicpc
   else
    CC = icpc
   endif
- OPTIMIZE = -Wall -O2
- #-opt-report-phase=offload
- #-vec-report2
- # -guide -parallel
+  OPTIMIZE = -Wall -O2
+  #-opt-report-phase=offload
+  #-vec-report2
+  # -guide -parallel
 endif
 
-# Configuration for PIZ DAINT at CSCS
-ifeq ($(SYSTYPE), "DAINT")
-
-ifeq (CUDA, $(findstring CUDA, $(OPT)))
-CUDATOOLKIT_HOME=/opt/nvidia/cudatoolkit/5.5.20-1.0501.7945.8.2/
-NVCC = nvcc
-NVCCARCH = -arch=sm_30
-NVCCFLAGS = -g  $(NVCCARCH) -dc -use_fast_math
-LIB_OPT  += -L$(CUDATOOLKIT_HOME)/lib64 -lcudart
-SUP_INCL += -I$(CUDATOOLKIT_HOME)/include
-OPTIMIZE = -O3
-endif
- ifeq (HDF5,$(findstring HDF5,$(OPT)))
-  HDF5_HOME = /opt/cray/hdf5-parallel/1.8.13/gnu/48/
-  LIB_HDF5  = -L$(HDF5_HOME)lib -Wl,-rpath,$(HDF5_HOME)/lib -lhdf5 -lz
-  HDF5_INCL = -I$(HDF5_HOME)include
- endif
- ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
-	CC = cc
-endif
-
-endif
-
-# Configuration for SLES11 Linux clusters at the Garching computing centre (RZG):
-# ->  gcc/IntelMPI_4.0.0, requires "module load impi"
-ifeq ($(SYSTYPE),"RZG-SLES11-generic")
- ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
-  CC       = mpigxx
- else
-  CC       = g++
- endif
- ifeq (HDF5,$(findstring HDF5,$(OPT)))
-  HDF5_HOME = /afs/ipp/home/k/khr/soft/amd64_sles11/opt/hdf5/1.8.7
-  LIB_HDF5  = -L$(HDF5_HOME)/lib -Wl,-rpath,$(HDF5_HOME)/lib -lhdf5 -lz
-  HDF5_INCL = -I$(HDF5_HOME)/include
- endif
- OPTIMIZE += -O3 -msse3
- OMP       = -fopenmp
-endif
-
-
-ifeq ($(SYSTYPE),"GP")
- CC       =  nvcc -g
- ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
-  CC       =  mpicxx -g -I$(CUDA_HOME)/sdk/common/inc -I$(CUDA_HOME)/sdk/C/common/inc -I$(CUDA_HOME)/include
- endif
- NVCC       =  nvcc -g
- OPTIMIZE = -O2
- LIB_OPT  =  -L$(CUDA_HOME)/lib -L$(CUDA_HOME)/lib64 -lcudart
- OMP =
- #-Xcompiler -openmp
- SUP_INCL += -I$(CUDA_HOME)/sdk/common/inc -I$(CUDA_HOME)/sdk/C/common/inc # -I$(CUDA_HOME)/include  -Icuda
-endif
-
-ifeq ($(SYSTYPE),"PLX")
- ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
-  CC  =  mpiCC -g
- else
-  CC  = g++
- endif
- OPTIMIZE = -O2 -DDEBUG
- OMP = #-fopenmp
- ifeq (CUDA,$(findstring CUDA,$(OPT)))
-  NVCC = nvcc -arch sm_20 -use_fast_math
-  LIB_OPT  =  -L$(CUDA_HOME)/lib64 -lcudart
-  SUP_INCL += -I$(CUDA_HOME)/include -I$(CUDA_SDK)/CUDALibraries/common/inc
- endif
- ifeq (OPENCL,$(findstring OPENCL,$(OPT)))
-  LIB_OPT  =  -L$(CUDA_HOME)/lib64 -L$(CUDA_HOME)/lib -lOpenCL
-  SUP_INCL += -I$(CUDA_HOME)/include
- endif
-endif
-
-ifeq ($(SYSTYPE),"GSTAR")
- ifeq (USE_MPI, $(findstring USE_MPI, $(OPT)))
-  CC = mpic++ #-I/usr/local/x86_64/intel/openmpi-1.8.3/include -pthread
- else
-  CC = g++
- endif
- ifeq (HDF5,$(findstring HDF5,$(OPT)))
-  HDF5_HOME = /usr/local/x86_64/gnu/hdf5-1.8.15
-  LIB_HDF5  = -L$(HDF5_HOME)/lib -lhdf5
-  HDF5_INCL = -I$(HDF5_HOME)/include
- endif
- ifeq (CUDA,$(findstring CUDA,$(OPT)))
- NVCC       =  nvcc
- CUDA_HOME  =  /usr/local/cuda-7.5
- LIB_OPT  += -L$(CUDA_HOME)/lib64 -lcudart
- SUP_INCL += -I$(CUDA_HOME)/include
- NVCCFLAGS = -g -arch=sm_20 -dc -std=c++11
-
- endif
- OMP = -fopenmp
-endif
 
 #--------------------------------------- Here we go
 
@@ -293,13 +291,13 @@ EXEC1 = Galaxy
 
 OBJS  =	kernel/transform.o cxxsupport/error_handling.o \
         reader/mesh_reader.o reader/visivo_reader.o \
-	      cxxsupport/mpi_support.o cxxsupport/paramfile.o cxxsupport/string_utils.o \
-	      cxxsupport/announce.o cxxsupport/ls_image.o reader/gadget_reader.o \
-	      reader/millenium_reader.o reader/bin_reader.o reader/bin_reader_mpi.o reader/tipsy_reader.o \
-	      splotch/splotchutils.o splotch/splotch.o \
-	      splotch/scenemaker.o splotch/splotch_host.o splotch/new_renderer.o cxxsupport/walltimer.o c_utils/walltime_c.o \
-	      booster/mesh_creator.o booster/randomizer.o booster/p_selector.o booster/m_rotation.o \
-	      reader/ramses_reader.o reader/enzo_reader.o reader/bonsai_reader.o reader/ascii_reader.o
+	cxxsupport/mpi_support.o cxxsupport/paramfile.o cxxsupport/string_utils.o \
+	cxxsupport/announce.o cxxsupport/ls_image.o reader/gadget_reader.o \
+	reader/millenium_reader.o reader/bin_reader.o reader/bin_reader_mpi.o reader/tipsy_reader.o \
+	splotch/splotchutils.o splotch/splotch.o \
+	splotch/scenemaker.o splotch/splotch_host.o splotch/new_renderer.o cxxsupport/walltimer.o c_utils/walltime_c.o \
+	booster/mesh_creator.o booster/randomizer.o booster/p_selector.o booster/m_rotation.o \
+	reader/ramses_reader.o reader/enzo_reader.o reader/bonsai_reader.o reader/ascii_reader.o
 
 OBJS1 = galaxy/Galaxy.o galaxy/GaussRFunc.o galaxy/Box_Muller.o galaxy/ReadBMP.o \
 	galaxy/CalculateDensity.o galaxy/CalculateColours.o galaxy/GlobularCluster.o \
@@ -310,36 +308,33 @@ OBJSC = cxxsupport/paramfile.o cxxsupport/error_handling.o cxxsupport/mpi_suppor
 	cxxsupport/announce.o cxxsupport/ls_image.o cxxsupport/walltimer.o
 
 ifeq (HDF5,$(findstring HDF5,$(OPT)))
- OBJS += reader/hdf5_reader.o
- OBJS += reader/gadget_hdf5_reader.o
- #OBJS += reader/galaxy_reader.o
- #OBJS += reader/h5part_reader.o
+  OBJS += reader/hdf5_reader.o
+  OBJS += reader/gadget_hdf5_reader.o
+  #OBJS += reader/galaxy_reader.o
+  #OBJS += reader/h5part_reader.o
 endif
 
 ifeq (FITS,$(findstring FITS,$(OPT)))
- OBJS += reader/fits_reader.o
- LIB_FITSIO = -lcfitsio
+  OBJS += reader/fits_reader.o
+  LIB_FITSIO = -lcfitsio
 endif
 
 # OpenCL and CUDA config
 ifeq (OPENCL,$(findstring OPENCL,$(OPT)))
- OBJS += opencl/splotch.o opencl/CuPolicy.o opencl/splotch_cuda2.o opencl/deviceQuery.o
+  OBJS += opencl/splotch.o opencl/CuPolicy.o opencl/splotch_cuda2.o opencl/deviceQuery.o
 else
-ifeq (CUDA,$(findstring CUDA,$(OPT)))
+  ifeq (CUDA,$(findstring CUDA,$(OPT)))
   OBJS += cuda/cuda_splotch.o cuda/cuda_policy.o cuda/cuda_utils.o cuda/cuda_device_query.o cuda/cuda_kernel.o cuda/cuda_render.o
   CULINK = cuda/cuda_link.o
- endif
+  endif
 endif
 
 # Intel MIC config
 ifeq (MIC,$(findstring MIC,$(OPT)))
-OBJS += mic/mic_splotch.o mic/mic_compute_params.o mic/mic_kernel.o mic/mic_allocator.o
-OPTIONS += -offload-option,mic,compiler," -fopenmp -Wall -O3 -L. -z defs"
+  OBJS += mic/mic_splotch.o mic/mic_compute_params.o mic/mic_kernel.o mic/mic_allocator.o
+  OPTIONS += -offload-option,mic,compiler," -fopenmp -Wall -O3 -L. -z defs"
 endif
 
-ifeq (USE_MPIIO,$(findstring USE_MPIIO,$(OPT)))
- LIB_MPIIO = -Lmpiio-1.0/lib -lpartition
-endif
 
 ##################################################
 #        SPLOTCH PREVIEWER SECTION
