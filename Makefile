@@ -46,7 +46,7 @@ SYSTYPE="generic"
 #SYSTYPE="GP"
 #SYSTYPE="DAINT"
 #SYSTYPE="GSTAR"
-SYSTYPE="SuperMuc"
+#SYSTYPE="SuperMuc"
 
 ### visualization cluster at the Garching computing center (RZG):
 #SYSTYPE="RZG-SLES11-VIZ"
