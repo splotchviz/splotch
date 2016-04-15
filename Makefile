@@ -106,14 +106,15 @@ ifeq ($(SYSTYPE),"mac")
   ifeq (CUDA,$(findstring CUDA,$(OPT)))
 	#CC = CC
 	NVCC = nvcc
+	NVCCARCH = -arch=sm_30
 	CUDA_HOME = /Developer/NVIDIA/CUDA-7.0/
 	OPTIMIZE = -Wall -stdlib=libstdc++ -Wno-unused-function -Wno-unused-variable -Wno-unused-const-variable
 	LIB_OPT  += -L$(CUDA_HOME)/lib -lcudart
-	NVCCFLAGS = -g -ccbin /usr/bin/clang -arch=sm_30 -dc
+	NVCCFLAGS = -g -ccbin /usr/bin/clang -dc -$(NVCCARCH)
 	SUP_INCL += -I$(CUDA_HOME)/include
 	ifeq (-fopenmp,$(OMP))
 		# Modify ccbin argument to point to your OpenMP enabled clang build (note clang++, this is important)
-		NVCCFLAGS = -g -ccbin /Users/tims/Programs/Clang-OpenMP/build/Debug+Asserts/bin/clang++ -arch=sm_30 -dc
+		NVCCFLAGS = -g -ccbin /Users/tims/Programs/Clang-OpenMP/build/Debug+Asserts/bin/clang++ -dc -$(NVCCARCH)
 	endif
   endif
   ifeq (-fopenmp,$(OMP))
@@ -206,10 +207,11 @@ ifeq ($(SYSTYPE),"GSTAR")
   endif
   ifeq (CUDA,$(findstring CUDA,$(OPT)))
   NVCC       =  nvcc
+  NVCCARCH = -arch=sm_20
+  NVCCFLAGS = -g  $(NVCCARCH) -dc -std=c++11
   CUDA_HOME  =  /usr/local/cuda-7.5
   LIB_OPT  += -L$(CUDA_HOME)/lib64 -lcudart
   SUP_INCL += -I$(CUDA_HOME)/include
-  NVCCFLAGS = -g -arch=sm_20 -dc -std=c++11
   endif
   OMP = -fopenmp
 endif
