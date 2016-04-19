@@ -22,6 +22,7 @@
 #include "splotch/splotchutils.h"
 #include "cxxsupport/mpi_support.h"
 #include "cxxsupport/string_utils.h"
+#include "cxxsupport/lsconstants.h"
 
 using namespace std;
 
@@ -230,8 +231,8 @@ void Camera_Calculator::calculateCameraPosition(BoundingBox box, std::string fac
 	{
 	case FRONT:
 	{
-				  float distanceWidth = (((box.maxX - box.minX) / 2)) / (tan(degreesToRadians(cameraFieldOfView / 2))) + box.maxY;
-				  float distanceHeight = (((box.maxZ - box.minZ) / 2)) / (tan(degreesToRadians(cameraFieldOfView / 2))) + box.maxY;
+				  float distanceWidth = (((box.maxX - box.minX) / 2)) / (tan((cameraFieldOfView / 2) * degr2rad)) + box.maxY;
+				  float distanceHeight = (((box.maxZ - box.minZ) / 2)) / (tan((cameraFieldOfView / 2) * degr2rad)) + box.maxY;
 
 				  float distanceFromBox = (distanceWidth > distanceHeight) ? distanceWidth : distanceHeight;
 
@@ -245,8 +246,8 @@ void Camera_Calculator::calculateCameraPosition(BoundingBox box, std::string fac
 
 	case LEFT:
 	{
-				 float distanceWidth = (((box.maxY - box.minY) / 2) / tan(degreesToRadians(cameraFieldOfView / 2))) + box.maxX;
-				 float distanceHeight = (((box.maxZ - box.minZ) / 2) / tan(degreesToRadians(cameraFieldOfView / 2))) + box.maxX;
+				 float distanceWidth = (((box.maxY - box.minY) / 2) / tan((cameraFieldOfView / 2) * degr2rad)) + box.maxX;
+				 float distanceHeight = (((box.maxZ - box.minZ) / 2) / tan((cameraFieldOfView / 2) * degr2rad)) + box.maxX;
 
 				 float distanceFromBox = (distanceWidth > distanceHeight) ? distanceWidth : distanceHeight;
 
@@ -260,8 +261,8 @@ void Camera_Calculator::calculateCameraPosition(BoundingBox box, std::string fac
 
 	case RIGHT:
 	{
-				  float distanceWidth = (((box.maxY - box.minY) / 2) / tan(degreesToRadians(cameraFieldOfView / 2))) + box.maxX;
-				  float distanceHeight = (((box.maxZ - box.minZ) / 2) / tan(degreesToRadians(cameraFieldOfView / 2))) + box.maxX;
+				  float distanceWidth = (((box.maxY - box.minY) / 2) / tan((cameraFieldOfView / 2) * degr2rad)) + box.maxX;
+				  float distanceHeight = (((box.maxZ - box.minZ) / 2) / tan((cameraFieldOfView / 2) * degr2rad)) + box.maxX;
 
 				  float distanceFromBox = (distanceWidth > distanceHeight) ? distanceWidth : distanceHeight;
 
@@ -275,8 +276,8 @@ void Camera_Calculator::calculateCameraPosition(BoundingBox box, std::string fac
 
 	case BACK:
 	{
-				 float distanceWidth = (((box.maxX - box.minX) / 2) / tan(degreesToRadians(cameraFieldOfView / 2))) + box.maxY;
-				 float distanceHeight = (((box.maxZ - box.minZ) / 2) / tan(degreesToRadians(cameraFieldOfView / 2))) + box.maxY;
+				 float distanceWidth = (((box.maxX - box.minX) / 2) / tan((cameraFieldOfView / 2) * degr2rad)) + box.maxY;
+				 float distanceHeight = (((box.maxZ - box.minZ) / 2) / tan((cameraFieldOfView / 2) * degr2rad)) + box.maxY;
 
 				 float distanceFromBox = (distanceWidth > distanceHeight) ? distanceWidth : distanceHeight;
 
@@ -290,8 +291,8 @@ void Camera_Calculator::calculateCameraPosition(BoundingBox box, std::string fac
 
 	case TOP:
 	{
-				float distanceWidth = (((box.maxX - box.minX) / 2) / tan(degreesToRadians(cameraFieldOfView / 2))) + box.maxZ;
-				float distanceHeight = (((box.maxY - box.minY) / 2) / tan(degreesToRadians(cameraFieldOfView / 2))) + box.maxZ;
+				float distanceWidth = (((box.maxX - box.minX) / 2) / tan((cameraFieldOfView / 2) * degr2rad)) + box.maxZ;
+				float distanceHeight = (((box.maxY - box.minY) / 2) / tan((cameraFieldOfView / 2) * degr2rad)) + box.maxZ;
 
 				float distanceFromBox = (distanceWidth > distanceHeight) ? distanceWidth : distanceHeight;
 
@@ -305,8 +306,8 @@ void Camera_Calculator::calculateCameraPosition(BoundingBox box, std::string fac
 
 	case BOTTOM:
 	{
-				   float distanceWidth = (((box.maxX - box.minX) / 2) / tan(degreesToRadians(cameraFieldOfView / 2))) + box.maxZ;
-				   float distanceHeight = (((box.maxY - box.minY) / 2) / tan(degreesToRadians(cameraFieldOfView / 2))) + box.maxZ;
+				   float distanceWidth = (((box.maxX - box.minX) / 2) / tan((cameraFieldOfView / 2) * degr2rad)) + box.maxZ;
+				   float distanceHeight = (((box.maxY - box.minY) / 2) / tan((cameraFieldOfView / 2) * degr2rad)) + box.maxZ;
 
 				   float distanceFromBox = (distanceWidth > distanceHeight) ? distanceWidth : distanceHeight;
 

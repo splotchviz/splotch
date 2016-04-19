@@ -36,21 +36,8 @@
 #include <algorithm>
 #include "datatypes.h"
 
-#ifndef M_PI
-#define M_PI           3.14159265358979323846
-#endif
-
 /*! \defgroup mathutilsgroup Mathematical helper functions */
 /*! \{ */
-static float degreesToRadians(float degrees)
-{
-    return (degrees * M_PI) / 180.0f;
-}
-
-static float radiansToDegrees(float radians)
-{
-    return (radians * 180.0f) / M_PI;
-}
 
 /*! Returns \e true if | \a a-b | <= \a epsilon * | \a b |, else \e false. */
 template<typename F> inline bool approx (F a, F b, F epsilon=1e-5)

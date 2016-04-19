@@ -33,10 +33,7 @@
 #define PLANCK_SHARE_UTILS_H
 
 #include "datatypes.h"
-#ifdef WINDOWSCINDER
-#include <Windows.h>
 #include <algorithm>
-#endif
 
 /*! Divides the index range [\a glo; \a ghi) into \a nshares approximately
     equal parts, and returns the sub-range [\a lo; \a hi) of the
