@@ -25,24 +25,20 @@
 /*
  *  Functionality for reading wall clock time
  *
- *  Copyright (C) 2010, 2011 Max-Planck-Society
+ *  Copyright (C) 2010-2016 Max-Planck-Society
  *  Author: Martin Reinecke
  */
 
 #if defined (_OPENMP)
-	#include <omp.h>
+#include <omp.h>
 #elif defined (USE_MPI)
-	#include "mpi.h"
-#endif
-
-#ifdef WINDOWSCINDER
-	#include <Windows.h>
-	#include <stdint.h>
-#endif
-#ifndef WINDOWSCINDER
-	#include <sys/time.h>
-#endif
+#include "mpi.h"
+#elif defined (_WIN32)
+#include <Windows.h>
+#else
+#include <sys/time.h>
 #include <stdlib.h>
+#endif
 
 #include "walltime_c.h"
 
@@ -52,6 +48,17 @@ double wallTime(void)
   return omp_get_wtime();
 #elif defined (USE_MPI)
   return MPI_Wtime();
+#elif defined (_WIN32)
+  static double inv_freq = -1.;
+  if (inv_freq<0)
+    {
+    LARGE_INTEGER freq;
+    QueryPerformanceFrequency(&freq);
+    inv_freq = 1. / double(freq.QuadPart);
+    }
+  LARGE_INTEGER count;
+  QueryPerformanceCounter(&count);
+  return count.QuadPart*inv_freq;
 #else
   struct timeval t;
   gettimeofday(&t, NULL);
