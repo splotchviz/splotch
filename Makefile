@@ -139,7 +139,7 @@ ifeq ($(SYSTYPE),"Linux-cluster")
   else
    CC  = g++
   endif
-  OPTIMIZE = -O2 
+  OPTIMIZE += -O2 
   OMP = -fopenmp
   ifeq (CUDA,$(findstring CUDA,$(OPT)))
   CUDA_HOME = /usr/local/cuda/
