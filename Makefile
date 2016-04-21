@@ -158,10 +158,10 @@ endif
 # Configuration for PIZ DAINT at CSCS
 ifeq ($(SYSTYPE), "DAINT")
   ifeq (CUDA, $(findstring CUDA, $(OPT)))
-  CUDATOOLKIT_HOME=/opt/nvidia/cudatoolkit/5.5.20-1.0501.7945.8.2/
+  CUDATOOLKIT_HOME=/opt/nvidia/cudatoolkit/7.028-1.0502.10742.5.1
   NVCC = nvcc
   NVCCARCH = -arch=sm_30
-  NVCCFLAGS = -g  $(NVCCARCH) -dc -use_fast_math
+  NVCCFLAGS = -g  $(NVCCARCH) -dc -use_fast_math -std=c++11 -ccbin=CC
   LIB_OPT  += -L$(CUDATOOLKIT_HOME)/lib64 -lcudart
   SUP_INCL += -I$(CUDATOOLKIT_HOME)/include
   OPTIMIZE = -O3
@@ -172,7 +172,7 @@ ifeq ($(SYSTYPE), "DAINT")
   HDF5_INCL = -I$(HDF5_HOME)include
   endif
   ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
-	CC = cc
+	CC = CC
   endif
 endif
 
