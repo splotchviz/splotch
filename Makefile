@@ -88,7 +88,7 @@ ifeq ($(SYSTYPE),"generic")
   ifeq (CUDA,$(findstring CUDA,$(OPT)))
   NVCC       =  nvcc
   NVCCARCH = -arch=sm_30
-  NVCCFLAGS = -g  $(NVCCARCH) -dc
+  NVCCFLAGS = -g  $(NVCCARCH) -dc -std=c++11
   CUDA_HOME  =  /opt/nvidia/cudatoolkit/default 
   LIB_OPT  += -L$(CUDA_HOME)/lib64 -lcudart
   SUP_INCL += -I$(CUDA_HOME)/include
@@ -145,7 +145,7 @@ ifeq ($(SYSTYPE),"Linux-cluster")
   CUDA_HOME = /usr/local/cuda/
   NVCC = nvcc
   NVCCARCH = -arch=sm_30
-  NVCCFLAGS = -g  $(NVCCARCH) -dc -use_fast_math
+  NVCCFLAGS = -g  $(NVCCARCH) -dc -use_fast_math -std=c++11
   LIB_OPT  =  -L$(CUDA_HOME)/lib64 -lcudart
   SUP_INCL += -I$(CUDA_HOME)/include
   endif
