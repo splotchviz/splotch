@@ -159,7 +159,7 @@ int main (int argc, const char **argv)
   int nTasksDev;     // number of processes using the same GPU
 #ifdef CUDA
   // We assume a geometry where processes use only one gpu if available
-  int nDevProc = 1;   // number of GPU required per process
+  //int nDevProc = 1;   // number of GPU required per process (unused)
   int nTasksNode = 1 ; //number of processes per node (=1 default configuration)
   if (nDevNode > 0)
     {
@@ -171,10 +171,14 @@ int main (int argc, const char **argv)
     if (master) cout << "HyperQ enabled" << endl;
 #else
     // only the first nDevNode processes of the node will use a GPU, each exclusively.
+    nTasksNode = params.find<int>("tasks_per_node",1); //number of processes per node
     mydevID = myID%nTasksNode; //ID within the node
     nTasksDev = 1;
     if (master)
+    {
        cout << "Configuration supported is 1 gpu for each mpi process" << endl;
+       cout << "Each node has " << nTasksNode << " ranks, and " << nDevNode << " gpus." << endl;
+    }
     if (mydevID>=nDevNode)
       {
       cout << "There isn't a gpu available for process = " << myID << " computation will be performed on the host" << endl;
