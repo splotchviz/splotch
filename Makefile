@@ -70,7 +70,7 @@ OMP      = -fopenmp
 SUP_INCL = -I. -Icxxsupport -Ic_utils -Ivectorclass
 
 # optimization and warning flags (g++)
-OPTIMIZE =  -pedantic -Wno-long-long -Wfatal-errors -Wextra -Wall -Wstrict-aliasing=2 -Wundef -Wshadow -Wwrite-strings -Wredundant-decls -Woverloaded-virtual -Wcast-qual -Wcast-align -Wpointer-arith -std=c++11 -march=native
+OPTIMIZE =  -pedantic -Wno-long-long -Wfatal-errors -Wextra -Wall -Wstrict-aliasing=2 -Wundef -Wshadow -Wwrite-strings -Wredundant-decls -Woverloaded-virtual -Wcast-qual -Wcast-align -Wpointer-arith -std=c++11 -march=native -std=c++11
 #-Wno-newline-eof -g
 #-Wold-style-cast -std=c++11
 
@@ -164,7 +164,6 @@ ifeq ($(SYSTYPE), "DAINT")
   NVCCFLAGS = -g  $(NVCCARCH) -dc -use_fast_math -std=c++11 -ccbin=CC
   LIB_OPT  += -L$(CUDATOOLKIT_HOME)/lib64 -lcudart
   SUP_INCL += -I$(CUDATOOLKIT_HOME)/include
-  OPTIMIZE = -O3
   endif
   ifeq (HDF5,$(findstring HDF5,$(OPT)))
   HDF5_HOME = /opt/cray/hdf5-parallel/1.8.13/gnu/48/
