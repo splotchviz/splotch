@@ -1065,6 +1065,7 @@ bool sceneMaker::getNextScene (vector<particle_sim> &particle_data,
 
   if (params.find<bool>("periodic",true))
     {
+    tstack_push("Box wrap");
     int npart = particle_data.size();
     double boxhalf = boxsize / 2;
 
@@ -1090,7 +1091,7 @@ bool sceneMaker::getNextScene (vector<particle_sim> &particle_data,
         particle_data[m].z += boxsize;
       }
 }
-
+   tstack_pop("Box wrap");
   }
 
   // Let's try to boost!!!
