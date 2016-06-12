@@ -1017,7 +1017,7 @@ bool sceneMaker::getNextScene (vector<particle_sim> &particle_data,
   string &outfile)
   {
   if (tsize(++cur_scene) >= scenes.size()) return false;
-  tstack_push("Scene setup");
+  //tstack_push("Scene setup");
   const scene &scn=scenes[cur_scene];
 
   // patch the params object with parameter values relevant to the current scene
@@ -1117,7 +1117,7 @@ bool sceneMaker::getNextScene (vector<particle_sim> &particle_data,
       logFile << it->first << "=" << it->second << endl;
     logFile.close();
     }
-tstack_pop("Scene setup");
+//tstack_pop("Scene setup");
   return true;
   }
 
