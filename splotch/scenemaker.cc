@@ -756,7 +756,9 @@ void sceneMaker::fetchFiles(vector<particle_sim> &particle_data, double fidx)
   {
   if (scenes[cur_scene].reuse_particles)
     {
+    tstack_push("Data copy");
     particle_data=p_orig;
+    tstack_pop("Data copy");
     return;
     }
   tstack_push("Input");
@@ -1017,7 +1019,8 @@ bool sceneMaker::getNextScene (vector<particle_sim> &particle_data,
   string &outfile)
   {
   if (tsize(++cur_scene) >= scenes.size()) return false;
-  //tstack_push("Scene setup");
+
+  tstack_push("Scene update");
   const scene &scn=scenes[cur_scene];
 
   // patch the params object with parameter values relevant to the current scene
@@ -1065,7 +1068,7 @@ bool sceneMaker::getNextScene (vector<particle_sim> &particle_data,
 
   if (params.find<bool>("periodic",true))
     {
-    tstack_push("Box wrap");
+    tstack_push("Box Wrap");
     int npart = particle_data.size();
     double boxhalf = boxsize / 2;
 
@@ -1091,7 +1094,7 @@ bool sceneMaker::getNextScene (vector<particle_sim> &particle_data,
         particle_data[m].z += boxsize;
       }
 }
-   tstack_pop("Box wrap");
+    tstack_pop("Box Wrap");
   }
 
   // Let's try to boost!!!
@@ -1117,7 +1120,7 @@ bool sceneMaker::getNextScene (vector<particle_sim> &particle_data,
       logFile << it->first << "=" << it->second << endl;
     logFile.close();
     }
-//tstack_pop("Scene setup");
+  tstack_pop("Scene update");
   return true;
   }
 
