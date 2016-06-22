@@ -43,6 +43,8 @@ void cuda_rendering(int mydevID, int nTasksDev, arr2<COLOUR> &pic, vector<partic
 #endif
 
   // CUDA Init
+  cu_Device(mydevID);
+  
   // Initialize policy class
   CuPolicy *policy = new CuPolicy(xres, yres, g_params); 
 
@@ -74,7 +76,7 @@ void cuda_rendering(int mydevID, int nTasksDev, arr2<COLOUR> &pic, vector<partic
 
   // Initialise device and allocate arrays
   bool doLogs;
-  int error = cu_init(mydevID, len, ntiles, &gv, g_params, campos, centerpos, lookat, sky, b_brightness, doLogs);
+  int error = cu_init(len, ntiles, &gv, g_params, campos, centerpos, lookat, sky, b_brightness, doLogs);
   tstack_pop("Device setup");
   if (!error)
   {
