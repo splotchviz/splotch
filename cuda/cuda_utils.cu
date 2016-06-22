@@ -31,10 +31,17 @@ extern __constant__ int ptype_points[10];
 
 #define CLEAR_MEM(p) if(p) {cudaFree(p); p=0;}
 
-
 template<typename T> T findParamWithoutChange(paramfile *param, std::string &key, T &deflt)
 {
   return param->param_present(key) ? param->find<T>(key) : deflt;
+}
+
+void cu_Device(int devID)
+{
+  cudaError_t error;
+  cudaSetDevice (devID); // initialize cuda runtime
+ 
+  if (error) printf("Error setting device\n");
 }
 
 void cu_get_trans_params(cu_param &para_trans, paramfile &params, const vec3 &campos, const vec3 &lookat, vec3 &sky, const vec3 &centerpos)
@@ -111,10 +118,9 @@ void cu_get_trans_params(cu_param &para_trans, paramfile &params, const vec3 &ca
 }
 
 
-int cu_init(int devID, long int nP, int ntiles, cu_gpu_vars* pgv, paramfile &fparams, const vec3 &campos, const vec3 &centerpos, const vec3 &lookat, vec3 &sky, float b_brightness, bool& doLogs)
+int cu_init(long int nP, int ntiles, cu_gpu_vars* pgv, paramfile &fparams, const vec3 &campos, const vec3 &centerpos, const vec3 &lookat, vec3 &sky, float b_brightness, bool& doLogs)
 {
   cudaError_t error;
-  cudaSetDevice (devID); // initialize cuda runtime
  
   // particle vector  
   size_t size = nP * sizeof(cu_particle_sim);
