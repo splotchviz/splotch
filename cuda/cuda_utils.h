@@ -133,9 +133,9 @@ struct cu_gpu_vars
 
 };
 
-
+void      cu_Device(int devID);
 void      cu_get_trans_params(cu_param &para_trans, paramfile &params, const vec3 &campos, const vec3 &lookat, vec3 &sky, const vec3 &centerpos);
-int       cu_init(int devID, long int nP, int ntiles, cu_gpu_vars* pgv, paramfile &fparams, const vec3 &campos, const vec3 &centerpos, const vec3 &lookat, vec3 &sky, float b_brightness, bool& doLogs);
+int       cu_init(long int nP, int ntiles, cu_gpu_vars* pgv, paramfile &fparams, const vec3 &campos, const vec3 &centerpos, const vec3 &lookat, vec3 &sky, float b_brightness, bool& doLogs);
 void      cu_init_colormap(cu_colormap_info info, cu_gpu_vars* pgv);
 int       cu_copy_particles_to_device(cu_particle_sim* h_pd, unsigned int n, cu_gpu_vars* pgv);
 int       cu_range(int nP, cu_gpu_vars* pgv);
