@@ -113,16 +113,16 @@ ifeq ($(SYSTYPE),"mac")
 	SUP_INCL += -I$(CUDA_HOME)/include
 	ifeq (-fopenmp,$(OMP))
 		# Modify ccbin argument to point to your OpenMP enabled clang build (note clang++, this is important)
-		NVCCFLAGS = -g -ccbin /Users/tims/Programs/Clang-OpenMP/build/Debug+Asserts/bin/clang++ -dc -$(NVCCARCH)
+		NVCCFLAGS = -g -ccbin /path/to/openmp/supported/c++/compiler -dc -$(NVCCARCH)
 	endif
   endif
   ifeq (-fopenmp,$(OMP))
 	# Change this as above
-	CC = /Users/tims/Programs/Clang-OpenMP/build/Debug+Asserts/bin/clang++
+	CC = /path/to/openmp/supporting/clang
 	OPTIMIZE = -Wall -stdlib=libstdc++ -Wno-unused-function -Wno-unused-variable -Wno-unused-const-variable
 	# These should point to your include and library folders for an openmp runtime library
-	SUP_INCL += -I/Users/tims/Programs/Intel-OMP-RT/libomp_oss/exports/common/include/
-	LIB_OPT += -L/Users/tims/Programs/Intel-OMP-RT/libomp_oss/exports/mac_32e/lib.thin/
+	SUP_INCL += -I/path/to/openmp/runtime/include/
+	LIB_OPT += -L/path/to/openmp/runtime/lib/
   endif
   ifeq (PREVIEWER,$(findstring PREVIEWER,$(OPT)))
 	SUP_INCL += -I/opt/X11/include
