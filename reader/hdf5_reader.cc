@@ -317,33 +317,33 @@ void hdf5_reader (paramfile &params, vector<particle_sim> &points)
 	        }
 	        planck_assert(false, "Only reading snapshots- Exiting...");
 		}
-	else
-	{
-		if (mpiMgr.master()) cout << "Copying buffer" << endl;
-		particleCount = 0;
-		for (int64 i=0; i<npart; ++i){
-			//cout << fileDataBuffer[i].snapshot;
-			if (snapshotID != -1 && fileDataBuffer[i].snapshot != snapshotID) {continue; }
-			points[particleCount].x = fileDataBuffer[i].x;
-			points[particleCount].y = fileDataBuffer[i].y;
-			points[particleCount].z = fileDataBuffer[i].z;
-			points[particleCount].e.r = fileDataBuffer[i].C1;
-			points[particleCount].e.g = fileDataBuffer[i].C2;
-			points[particleCount].e.b = fileDataBuffer[i].C3;
-			points[particleCount].r = fileDataBuffer[i].r;
-			particleCount++;
-		}
-		points.resize(particleCount + 1);
+  	else
+  	{
+  		if (mpiMgr.master()) cout << "Copying buffer" << endl;
+  		particleCount = 0;
+  		for (int64 i=0; i<npart; ++i){
+  			//cout << fileDataBuffer[i].snapshot;
+  			if (snapshotID != -1 && fileDataBuffer[i].snapshot != snapshotID) {continue; }
+  			points[particleCount].x = fileDataBuffer[i].x;
+  			points[particleCount].y = fileDataBuffer[i].y;
+  			points[particleCount].z = fileDataBuffer[i].z;
+  			points[particleCount].e.r = fileDataBuffer[i].C1;
+  			points[particleCount].e.g = fileDataBuffer[i].C2;
+  			points[particleCount].e.b = fileDataBuffer[i].C3;
+  			points[particleCount].r = fileDataBuffer[i].r;
+  			particleCount++;
+  		}
+  		points.resize(particleCount + 1);
 
-		if (mpiMgr.master()) cout << "Total particles to render = " << points.size() << endl;
+  		if (mpiMgr.master()) cout << "Total particles to render = " << points.size() << endl;
 
-		H5Dvlen_reclaim(fileData_tid, dataset_space, H5P_DEFAULT, fileDataBuffer);
-		free(fileDataBuffer);
-		H5Tclose(fileData_tid);
-		H5Sclose(memoryspace);
-		H5Sclose(dataset_space);
-		H5Dclose(dataset_id);
-	}
+  		H5Dvlen_reclaim(fileData_tid, dataset_space, H5P_DEFAULT, fileDataBuffer);
+  		free(fileDataBuffer);
+  		H5Tclose(fileData_tid);
+  		H5Sclose(memoryspace);
+  		H5Sclose(dataset_space);
+  		H5Dclose(dataset_id);
+  	}
 	}
 	else
 	{
@@ -374,7 +374,7 @@ void hdf5_reader (paramfile &params, vector<particle_sim> &points)
 #define CASEMACRO__(num,str)\
       case num:\
         for (int64 i=0; i<npart; ++i){\
-			points[i].str = buffer[i];}\ 
+			points[i].str = buffer[i];}\
         break;
 
     switch(qty)

@@ -221,8 +221,11 @@ void sceneMaker::particle_normalize(vector<particle_sim> &p, bool verbose)
       cout << " Intensity Range: " << intnorm[t].minv << " (min) , " <<
            intnorm[t].maxv << " (max) " << endl;
       cout << " Size Range: " << sizenorm[t].minv << " (min) , " <<
-	   sizenorm[t].maxv << " (max) " << endl;
+	    sizenorm[t].maxv << " (max) " << endl;
       }
+    // Set the range and clamp values in parameter file so we can find them again later
+    params.setParam("range_min"+dataToString(t), colnorm[t].minv);
+    params.setParam("range_max"+dataToString(t), colnorm[t].maxv);
 
     if(params.param_present("intensity_min"+dataToString(t)))
       intnorm[t].minv = params.find<float>("intensity_min"+dataToString(t));
@@ -235,6 +238,9 @@ void sceneMaker::particle_normalize(vector<particle_sim> &p, bool verbose)
 
     if(params.param_present("color_max"+dataToString(t)))
       colnorm[t].maxv = params.find<float>("color_max"+dataToString(t));
+
+    params.setParam("clamp_min"+dataToString(t), colnorm[t].minv);
+    params.setParam("clamp_max"+dataToString(t), colnorm[t].maxv);
 
     if (verbose && mpiMgr.master())
       {
@@ -519,8 +525,14 @@ void sceneMaker::particle_interpolate(vector<particle_sim> &p,double frac) const
                     << dvdx - a_found/tan(0.5*a_found) << endl;
               }
             }
-          if(iter >= 10)
-            planck_fail("could not find zero point for interpolation fit !");
+            // For the cray compiler downgrade this to a warning because theres something suspicious going on
+            // FIXME: investigate futher..
+         if(iter >= 10)
+          #ifndef _CRAYC
+           planck_fail("could not find zero point for interpolation fit !");        
+          #else
+            cout << "Warning: particle interpolate() could not find zero point for interpolation fit\n";
+          #endif
           // Now find the other aprameters
           double a0,a1,a2=myv1*v_unit1/a_found;
           if (abs(sin(a_found)) < 1e-6)
@@ -589,7 +601,13 @@ sceneMaker::sceneMaker (paramfile &par)
   if (geometry_file=="")
     {
     string outfilen = outfile+intToString(0,4);
+    #ifdef CLIENT_SERVER
+    if(params.find<bool>("server",false))
+       scenes.push_back(scene(outfilen,true,false));
+    else
+    #endif
     scenes.push_back(scene(outfilen,false,false));
+    
     }
   else
     {
@@ -753,12 +771,22 @@ sceneMaker::sceneMaker (paramfile &par)
   }
 
 void sceneMaker::fetchFiles(vector<particle_sim> &particle_data, double fidx)
-  {
+  { 
+
   if (scenes[cur_scene].reuse_particles)
     {
+      // For CUDA we dont need to restore the data as only GPU copy was modified
+#ifndef CUDA
     tstack_push("Data copy");
+#ifdef MPI_A_NEQ_E
+    if(mpiMgr.num_ranks() > 1)  tree.restore_data(tree_orig);
+    else                        particle_data=p_orig;
+#else
+        //printf("Reusing particle data, p_orig.size(): %lu\n", p_orig.size());
     particle_data=p_orig;
+#endif
     tstack_pop("Data copy");
+#endif
     return;
     }
   tstack_push("Input");
@@ -769,10 +797,16 @@ void sceneMaker::fetchFiles(vector<particle_sim> &particle_data, double fidx)
   int snr1_guess = int(fidx/spacing)*spacing, snr2_guess=snr1_guess+spacing;
   int snr1 = params.find<int>("snapshot_base1",snr1_guess);
   int snr2 = params.find<int>("snapshot_base2",snr2_guess);
-  double frac=(fidx-snr1)/(snr2-snr1);
+  double frac=params.find<float>("frac",(fidx-snr1)/(snr2-snr1));
 
   tstack_push("Reading");
 
+  if(file!=NULL) 
+  {
+    delete file; 
+    file = NULL;
+  }
+  
   switch (simtype)
     {
     case 0:
@@ -868,8 +902,14 @@ void sceneMaker::fetchFiles(vector<particle_sim> &particle_data, double fidx)
       break;
 #ifdef HDF5
     case 7:
-      hdf5_reader(params,particle_data);
+    {
+      if(!file)
+        file = new HDF5File();
+      file->read(params, particle_data);
+
+      //hdf5_reader(params,particle_data);
       break;
+    }
     case 8:
       // GADGET HDF5 READER
       if (interpol_mode>0) // Here only the two data sets are prepared, interpolation will be done later
@@ -928,7 +968,60 @@ void sceneMaker::fetchFiles(vector<particle_sim> &particle_data, double fidx)
       break;
 #endif
     case 11:
-      tipsy_reader(params,particle_data);
+      {
+        if (interpol_mode>0) // Here only the two data sets are prepared, interpolation will be done later
+        {
+          if (mpiMgr.master())
+            cout << "Loaded file1: " << snr1_now << " , file2: " << snr2_now
+                 << " , interpol fraction: " << frac << endl
+                 << " (needed files : " << snr1 << " , " << snr2 << ")" << endl;
+          if (snr1==snr2_now)
+            {
+            if (mpiMgr.master())
+              cout << " old2 = new1!" << endl;
+            p1.swap(p2);
+            id1.swap(id2);
+            idx1.swap(idx2);
+            time1 = time2;
+            snr1_now = snr1;
+            }
+          if (snr1_now!=snr1)
+            {
+            if (mpiMgr.master())
+              cout << " reading new1 " << snr1 << endl;
+    	       tipsy_reader(params, p1, id1, snr1);
+
+            mpiMgr.barrier();
+            tstack_replace("Reading","Particle index generation");
+            buildIndex(id1.begin(),id1.end(),idx1);
+            tstack_replace("Particle index generation","Reading");
+
+            snr1_now = snr1;
+            }
+          if (snr2_now!=snr2)
+            {
+            if (mpiMgr.master())
+              cout << " reading new2 " << snr2 << endl;
+
+          	  tipsy_reader(params, p2, id2, snr2);
+        	  
+        	  mpiMgr.barrier();
+                  tstack_replace("Reading","Particle index generation");
+                  buildIndex(id2.begin(),id2.end(),idx2);
+                  tstack_replace("Particle index generation","Fetch remote particles");
+
+            snr2_now = snr2;
+
+            MpiFetchRemoteParticles();
+            mpiMgr.barrier();
+            tstack_replace("Fetch remote particles","Reading");
+            }
+        }
+        else
+        {
+          tipsy_reader(params,particle_data, id1, 0);
+        }
+      }
       break;
 #ifdef HDF5
     case 12:
@@ -952,6 +1045,9 @@ void sceneMaker::fetchFiles(vector<particle_sim> &particle_data, double fidx)
       fits_reader(params,particle_data);
       break;
 #endif
+    default:
+      planck_fail("Invalid simtype!");
+      break;
     }
   mpiMgr.barrier();
   tstack_pop("Reading");
@@ -1000,7 +1096,32 @@ void sceneMaker::fetchFiles(vector<particle_sim> &particle_data, double fidx)
   tstack_pop("Particle ranging");
 #endif
 
-  if (scenes[cur_scene].keep_particles) p_orig = particle_data;
+#ifdef MPI_A_NEQ_E
+  if(mpiMgr.num_ranks()>1)
+  {
+    tstack_push("Tree build");
+    // Construct KD tree
+    tree.build(&particle_data[0], particle_data.size(), false, 0, mpiMgr.rank(), mpiMgr.num_ranks());
+    tstack_replace("Tree build","Tree redistribute");
+    tree.redistribute_data();
+    tstack_pop("Tree redistribute");
+    std::vector<particle_sim>().swap(particle_data);
+    //tree.status();
+    //tree.all_leaves_status();
+    tree.box();
+    // tree copy too 
+    if(scenes[cur_scene].keep_particles) tree.backup_data(tree_orig);    
+  }
+  else
+  {
+#endif
+// For cuda we dont need a copy of the particles as they are modified on GPU
+#ifndef CUDA
+    if (scenes[cur_scene].keep_particles) p_orig = particle_data;
+#endif
+#ifdef MPI_A_NEQ_E
+  }
+#endif
 
 // boost initialization
 
@@ -1028,43 +1149,19 @@ bool sceneMaker::getNextScene (vector<particle_sim> &particle_data,
   for (map<string,string>::const_iterator it=sceneParameters.begin(); it!=sceneParameters.end(); ++it)
     params.setParam(it->first, it->second);
 
+
   outfile=scn.outname;
   double fidx=params.find<double>("fidx",0);
-
   fetchFiles(particle_data,fidx);
 
-  //If the camera positions are blank, calculate a suitable one.
-  if (params.find<double>("camera_x", -1) == -1 && params.find<double>("camera_y", -1) == -1 && params.find<double>("camera_z", -1) == -1)
-  {
-    if (mpiMgr.master())
-    {
-      cout << "No camera position supplied. Calculating suitable position" << endl;
-    }
-    string face = params.find<string>("face", "-1");
-    int fov = params.find<int>("fov", 45);
-
-    bbox.Compute(particle_data);
-    camCalc.calculateCameraPosition(bbox, face, fov, campos, lookat, sky);
-    centerpos = campos;
-
-    if (mpiMgr.master())
-    {
-      cout << "Camera position-> x = " << campos.x << ", " << "y = " << campos.y << ", " <<  "z = " << campos.z << endl;
-      cout << "Lookat-> x = " << lookat.x << ", " << "y = " << lookat.y << ", " <<  "z = " << lookat.z << endl;
-    }
-
-  }
+  // Fetch the values from the param object which may have been altered by the scene file or copied from the opt object.
+  campos = vec3(params.find<double>("camera_x"), params.find<double>("camera_y"), params.find<double>("camera_z"));
+  lookat = vec3(params.find<double>("lookat_x"), params.find<double>("lookat_y"), params.find<double>("lookat_z"));
+  sky = vec3(params.find<double>("sky_x", 0), params.find<double>("sky_y", 0), params.find<double>("sky_z", 1));
+  if (params.param_present("center_x"))
+    centerpos = vec3(params.find<double>("center_x"), params.find<double>("center_y"), params.find<double>("center_z"));
   else
-  {
-	  // Fetch the values from the param object which may have been altered by the scene file or copied from the opt object.
-	  campos = vec3(params.find<double>("camera_x"), params.find<double>("camera_y"), params.find<double>("camera_z"));
-	  lookat = vec3(params.find<double>("lookat_x"), params.find<double>("lookat_y"), params.find<double>("lookat_z"));
-	  sky = vec3(params.find<double>("sky_x", 0), params.find<double>("sky_y", 0), params.find<double>("sky_z", 1));
-	  if (params.param_present("center_x"))
-		  centerpos = vec3(params.find<double>("center_x"), params.find<double>("center_y"), params.find<double>("center_z"));
-	  else
-		  centerpos = campos;
-  }
+    centerpos = campos; 
 
   if (params.find<bool>("periodic",true))
     {
@@ -1095,6 +1192,7 @@ bool sceneMaker::getNextScene (vector<particle_sim> &particle_data,
       }
 }
     tstack_pop("Box Wrap");
+
   }
 
   // Let's try to boost!!!
@@ -1108,7 +1206,8 @@ bool sceneMaker::getNextScene (vector<particle_sim> &particle_data,
     }
 
   // dump information on the currently rendered image into a log file in *scene file format*
-  if ( mpiMgr.master() )
+
+  if ( mpiMgr.master() && params.find<bool>("print_logfile", true))
     {
     string logFileName;
     logFileName.assign(outfile);
@@ -1122,6 +1221,18 @@ bool sceneMaker::getNextScene (vector<particle_sim> &particle_data,
     }
   tstack_pop("Scene update");
   return true;
+  }
+
+void sceneMaker::updateCurrentScene (vector<particle_sim> &particle_data, bool new_data)
+  { 
+
+  tstack_push("Scene update");
+  double fidx=params.find<double>("fidx",0);
+  // If there is no new data, reuse the particles
+  scenes[cur_scene].keep_particles = true;
+  scenes[cur_scene].reuse_particles = !new_data;
+  fetchFiles(particle_data,fidx);
+  tstack_pop("Scene update");
   }
 
 namespace {
@@ -1213,8 +1324,93 @@ void sceneMaker::MpiFetchRemoteParticles ()
 #endif
   }
 
+#ifdef MPI_A_NEQ_E
+void sceneMaker::treeInit()
+{
+       // Setup KD tree
+    sMaker.tree.add_smaller_than_function(xcomp_smaller);
+    sMaker.tree.add_smaller_than_function(ycomp_smaller);
+    sMaker.tree.add_smaller_than_function(zcomp_smaller);
+    sMaker.tree.add_accessor(x_accessor);
+    sMaker.tree.add_accessor(y_accessor);
+    sMaker.tree.add_accessor(z_accessor);
+    sMaker.tree.add_accessor(r_accessor);
+    sMaker.tree.add_accessor(ghost_accessor);
+
+    int depth = mpiMgr.num_ranks() > 1 ? ceil(log2(mpiMgr.num_ranks())) : 0;
+    sMaker.tree.set_ghosts(true/*, ghost_setter*/, depth);
+    // Max depth such that we have at least one leaf per node
+    sMaker.tree.set_max_depth(depth);
+    sMaker.tree.split_by_longest_axis();
+}
+
+ Box<float,3> bbox treeBoundingBox(render_context& rc)
+ {
+  rc.active_nodes = tree.active_node_list();
+  if(rc.active_nodes.size() != 1)
+    planck_fail("MPI_A_NEQ_E: Only supporting 1 node per rank so far (i.e. num ranks must be power of 2)");
+  // Get bounding box from tree to give to renderer
+  return sMaker.tree.node_box_to_raw(rc.active_nodes[0]);  
+ }
+  
+
+void treeUpdateOpacityRes(arr2<COLOUR>& pic, arr2<COLOUR>& opac);
+{
+  int x = pic.size1();
+  int y = pic.size2();
+  if(x != opac.size1() || y != opac.size2())
+    opac.alloc(x, y);
+}
+#endif 
+
+#ifdef CLIENT_SERVER
+// Unload data forcing deallocation
+void sceneMaker::unloadData(bool force_dealloc)
+{
+  for(auto&& i : scenes) 
+   i.keep_particles = true;
+  for(auto&& i : scenes) 
+   i.reuse_particles = false;
+
+ if(force_dealloc)
+ {
+  // Force deallocation
+   std::vector<particle_sim>().swap(p_orig);
+   if(interpol_mode>0)
+   {
+     std::vector<particle_sim>().swap(p1);
+     std::vector<particle_sim>().swap(p2);
+     std::vector<MyIDType>().swap(id1);
+     std::vector<MyIDType>().swap(id2);
+     std::vector<MyIDType>().swap(idx1);
+     std::vector<MyIDType>().swap(idx2);
+   }
+ }
+ else
+ {
+    p_orig.clear();
+   if(interpol_mode>0)
+   {
+     p1.clear();
+     p2.clear();
+     id1.clear();
+     id2.clear();
+     idx1.clear();
+     idx2.clear();
+   }
+ }
+
+ if(file!=NULL){
+  delete file;
+  file = NULL;
+ }
+
+}
+
+#endif
 #ifdef MIC
   // Check if we are on final scene, if so we must free memory
+  // NOTE: Should reconsider this for client server
   bool sceneMaker::is_final_scene()
   {
     return (cur_scene == scenes.size() - 1) ? true : false;

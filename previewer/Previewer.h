@@ -69,13 +69,13 @@ namespace previewer
 
 		void OnQuitApplication(Event);
 
-		void TriggerOnButtonPressEvent(std::string buttonPressed, float xPosition, float yPosition);
-		void TriggerOnButtonReleaseEvent(std::string buttonReleased, float xPosition, float yPosition);
-		void TriggerOnExposedEvent();
-		void TriggerOnKeyPressEvent(std::string keyPressed);
-		void TriggerOnKeyReleaseEvent(std::string keyReleased);
-		void TriggerOnMotionEvent(float xPosition, float yPosition);
-		void TriggerOnQuitApplicationEvent();
+		void TriggerOnButtonPressEvent(Event&);
+		void TriggerOnButtonReleaseEvent(Event&);
+		void TriggerOnExposedEvent(Event& );
+		void TriggerOnKeyPressEvent(Event&);
+		void TriggerOnKeyReleaseEvent(Event&);
+		void TriggerOnMotionEvent(Event&);
+		void TriggerOnQuitApplicationEvent(Event&);
 
 		void SetRenderWidth(int width);
 		void SetRenderHeight(int height);
@@ -120,10 +120,18 @@ namespace previewer
 		float GetSmoothingLength(int);
 
 		void SetParameter(std::string, std::string);
+		void PrintCamera();
 		// Note this getParameter function is only useful for displaying parameters. 
 		// They are not converted to their original format, they are kept as string
 		std::string GetParameter(std::string);
 		std::string GetParameter(std::string name, std::string dflt);
+
+		template<typename T>
+		T GetParameterT(std::string name, T dflt)
+		{
+			paramfile* param = parameterInfo.GetParamFileReference();
+			return param->find<T>(name, dflt);			
+		}
 
 		void ResetCamera();
 		void SetTarget(vec3f t);

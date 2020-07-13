@@ -26,8 +26,8 @@
 #include "cuda/cuda_utils.h"
 
 using namespace std;
-
+int get_device_image(arr2<COLOUR> &Pic_host, cu_gpu_vars* gv, int xres, int yres);
 int cu_draw_chunk(int mydevID, cu_particle_sim *d_particle_data, int nParticle, arr2<COLOUR> &Pic_host, cu_gpu_vars* gv, bool a_eq_e, float64 grayabsorb, int xres, int yres, bool doLogs);
-int add_device_image(arr2<COLOUR> &Pic_host, cu_gpu_vars* gv, int xres, int yres);
+int add_device_image(arr2<COLOUR> &Pic_host, cu_gpu_vars* gv, int xres, int yres, COLOUR* buf);
 
 #endif

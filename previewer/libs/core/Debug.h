@@ -22,6 +22,8 @@
 #ifndef SPLOTCH_PREVIEWER_DEBUG_MODE
 #define SPLOTCH_PREVIEWER_DEBUG_MODE
 
+//#define PREVIEWER_OPENGL
+
 //Debug include
 #include <cstdarg>
 #include <iostream>

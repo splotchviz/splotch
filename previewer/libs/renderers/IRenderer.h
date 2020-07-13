@@ -117,7 +117,7 @@ namespace previewer
 			return imageHeight;
 		}
 
-		void SetRenderBrightness(unsigned type, float b)
+		virtual void SetRenderBrightness(unsigned type, float b)
 		{
 			// Check if brightness container has element for this type already
 			if(type > (brightness.size()-1))
@@ -132,9 +132,9 @@ namespace previewer
 			return brightness[type];
 		}
 
-		void SetSmoothingLength(unsigned type, float sl)
+		virtual void SetSmoothingLength(unsigned type, float sl)
 		{
-			// Check if brightness container has element for this type already
+			// Check if container has element for this type already
 			if(type > (smoothingLength.size()-1))
 				smoothingLength.resize(type+1, 1);
 
@@ -170,6 +170,16 @@ namespace previewer
 		void SetTargetCenter()
 		{
 			camera.SetTarget(dataBBox.centerPoint);
+		}
+
+		virtual void PrintCamera()
+		{
+			  vec3f camPos = camera.GetCameraPosition();
+		      vec3f camLookAt = camera.GetLookAt();
+		      vec3f camUp = camera.GetUpVector();  
+		      printf("Camera position\t x: %f y: %f z: %f\n", camPos.x, camPos.y, camPos.z);
+		      printf("Camera lookat\t x: %f y: %f z: %f\n", camPos.x, camPos.y, camPos.z);
+		      printf("Camera upvector\t x: %f y: %f z: %f\n", camPos.x, camPos.y, camPos.z);
 		}
 
 	protected:

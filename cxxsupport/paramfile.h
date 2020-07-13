@@ -96,6 +96,8 @@ class paramfile
     /*! Sets the parameter with the name \a key to \a value. */
     template<typename T> void setParam (const std::string &key, const T &value)
       { setParamString(key,dataToString(value)); }
+    void setParam (const std::string &key, const std::string &value)
+      { setParamString(key,value); }
   };
 
 /*! Tries to build a \a paramfile object from the contents of a command line.

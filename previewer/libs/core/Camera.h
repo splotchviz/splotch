@@ -39,8 +39,10 @@
 #include "../events/OnKeyPressEvent.h"
 #include "../events/OnKeyReleaseEvent.h"
 
+#ifndef CLIENT_SERVER
 // Action includes
 #include "../events/actions/CameraAction.h"
+#endif
 
 namespace previewer
 {
@@ -57,17 +59,24 @@ namespace previewer
 
 	// Provides the functionality within the renderers for a movable
 	// and configurable camera through the use of event subscriptions.
+#ifdef CLIENT_SERVER
+	class Camera 
+#else
 	class Camera : public CameraAction
+#endif
 	{
 	public:
 		// Getters
 		vec3f GetCameraPosition();
 		vec3f GetLookAt();
 		vec3f GetUpVector();
+		vec3f GetTarget();
 
 		// Setters
 		void SetLookAt(vec3f);
 		void SetFieldOfView(float);
+		void SetMaxAcceleration(vec3f);
+		void SetMaxSpeed(vec3f);
 
 		// Creators
 		void Create(BoundingBox);
@@ -86,15 +95,36 @@ namespace previewer
 		void RotatePitch(float);
 		void RotateRoll(float);
 		void RotateAroundTarget(float, float, float);
-
+		void RotateTargetAround(float, float, float);
 		// Move functions relative to world axes 
 		void Move(vec3f);
 		void Move(float, float, float);
 
 		// Move functions relative to local axes
+		// Camera only
 		void MoveForward(float);
 		void MoveUpward(float);
 		void MoveRight(float);
+		// Camera and target
+		void MoveCamAndTargetForward(float);
+		void MoveCamAndTargetUpward(float);
+		void MoveCamAndTargetRight(float);
+		// Target only
+		void MoveTargetForward(float);
+		void MoveTargetUpward(float);
+		void MoveTargetRight(float);
+
+		// Physical movement
+		void AccelForward(float amount);
+		void AccelUpward(float amount);
+		void AccelRight(float amount);
+		void DecelForward(float amount);
+		void DecelUpward(float amount);
+		void DecelRight(float amount);
+		void UpdateSpeed();
+		void UpdateVelocity();
+		void UpdatePosition();
+
 
 		// Projections
 		void SetPerspectiveProjection(float, float, float, float);
@@ -107,7 +137,7 @@ namespace previewer
 		Matrix4 GetMVPMatrix();
 		Matrix4 GetViewMatrix();
 		Matrix4 GetProjectionMatrix();
-
+#ifndef CLIENT_SERVER
 		// Actions
 		void ActionMoveCameraPosition(vec3f, int);
 		void ActionMoveCameraLookAt(vec3f);
@@ -116,7 +146,7 @@ namespace previewer
 		void ActionGetCameraLookAt(vec3f&);
 		void ActionGetCameraUp(vec3f&);
 		void SetMainCameraStatus(bool);
-
+#endif
 	private:
 		// Camera positions and targets including orientation
 		vec3f cameraPosition;
@@ -124,6 +154,15 @@ namespace previewer
 		vec3f cameraTarget; // Setable target point to lookat/rotate around
 		vec3f cameraUpVector;
 		vec3f cameraRightVector;
+
+		// Proper movement for smooth camera transitions
+		// Acceleration and speed are treated seperately for x y z, 
+		// corresponding to right, up, forward respectively
+		vec3f acceleration;
+		vec3f maxAcceleration;
+		vec3f velocity;
+		vec3f speed;
+		vec3f maxSpeed;
 
 		// Camera projection settings
 		float cameraFieldOfView;

@@ -24,6 +24,7 @@
 #define READER_H
 
 #include "splotch/splotchutils.h"
+#include "hdf5_reader.h"
 
 void gadget_reader(paramfile &params, int interpol_mode,
   std::vector<particle_sim> &p, std::vector<MyIDType> &id,
@@ -44,7 +45,7 @@ void visivo_reader();
 long bin_reader_block_mpi (paramfile &params, std::vector<particle_sim> &points, float *maxr, float *minr, int mype, int npes);
 void mesh_reader(paramfile &params, std::vector<particle_sim> &points);
 void hdf5_reader(paramfile &params, std::vector<particle_sim> &points);
-void tipsy_reader(paramfile &params, std::vector<particle_sim> &points);
+void tipsy_reader(paramfile &params, std::vector<particle_sim> &points, std::vector<MyIDType> &id, int snr);
 void ramses_reader(paramfile &params, std::vector<particle_sim> &points);
 long enzo_reader (paramfile &params, std::vector<particle_sim> &points);
 void bonsai_reader (paramfile &params, std::vector<particle_sim> &points);
@@ -55,5 +56,6 @@ void fits_reader (paramfile &params, std::vector<particle_sim> &points);
 // Readers currently inactive
 //void galaxy_reader(paramfile &params, std::vector<particle_sim> &points);
 //void h5part_reader(paramfile &params, std::vector<particle_sim> &points);
+
 
 #endif

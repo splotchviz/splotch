@@ -106,6 +106,7 @@ namespace previewer
 			// Splotch 
 			void WriteParams(Previewer& pv, std::vector<std::string> args);	
 			void WriteSceneFile(Previewer& pv, std::vector<std::string> args);	
+			void PrintCamera(Previewer& pv, std::vector<std::string> args);
 
 			// Scene manipulation			
 			void SetPalette(Previewer& pv, std::vector<std::string> args);	

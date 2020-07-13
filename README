@@ -23,18 +23,10 @@ Splotch is written in the C++ language. To install it you have just to
 3) "make"
 
 Please Check your compiler for the OpenMP flags if you want to use
-OpenMP functionality (-fopenmp for g++) (on by default).
+OpenMP functionality (-fopenmp for g++).
 
 If you have an MPI environment installed, you can also enable
-the USE_MPI option (on by default).
-
-To test the code, untar the data/snap098.tgz file, then open the newly 
-created snap098.par file and modify the infile parameter such that the 
-path points to your Splotch install, then run:
-
-./Splotch-[extension] data/snap098.par 
-
-You should now see a snap0980000.tga file and log in the local directory.
+the USE_MPI option.
 
 To run it on your simulations, have a look into the demo.par
 file and set the parameters you prefer.

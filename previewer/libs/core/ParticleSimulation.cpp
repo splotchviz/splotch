@@ -73,9 +73,10 @@ namespace previewer
       	// Setup render screen size parameters (force update)
 		Update(true);
 
-		// Load based on parameter file
-		// Load particle data
+#ifndef REMOTE_VIEWER
+		// If not simply remote viewing, load the particle data
 		particles.Load();
+#endif
 
 		// Create instance of appropriate renderer, as specified in the makefile
 #if defined RENDER_FF_VBO
@@ -84,8 +85,10 @@ namespace previewer
 		renderer = new PP_GEOM();
 #elif defined RENDER_PP_FBO
 		renderer = new PP_FBO();
+#elif defined REMOTE_VIEWER
+		renderer = new RemoteViewer();
 #endif
-		if(renderer)
+		if(renderer != NULL)
 			DebugPrint("Render reference has been created\n");
 		else
 		{
@@ -112,6 +115,8 @@ namespace previewer
 
 	void ParticleSimulation::Unload()
 	{
+		if(renderer!=NULL)
+			renderer->Unload();
 		DebugPrint("Unloading Particle Simulation\n");
 	}
 
@@ -172,7 +177,6 @@ namespace previewer
 		// If it is not the first run and renderer needs updating, update the renderer
 		if(!firstRun && !rendererUpdated)
 		{
-			std::cout << "render update" << std::endl;
 			renderer->Update();
 			rendererUpdated = true;
 		}
@@ -406,5 +410,9 @@ namespace previewer
 		return exepath;
 	}
 
+	void ParticleSimulation::PrintCamera()
+	{
+		renderer->PrintCamera();
+	}
 
 }

@@ -34,7 +34,8 @@
 #include "luteditor.h"
 #endif
 
-#include<limits.h>
+#include <fstream>
+#include <limits.h>
 
 #ifdef LONGIDS
 #define MyIDType uint64
@@ -50,11 +51,18 @@ struct particle_sim
   float32 x,y,z,r,I;
   unsigned short type;
   bool active;
+#ifdef MPI_A_NEQ_E
+  unsigned short ghost;
+  float32 r2;
+#endif
 
   particle_sim (const COLOUR &e_, float32 x_, float32 y_, float32 z_, float32 r_,
                 float32 I_, int type_, bool active_)
-    : e(e_), x(x_), y(y_), z(z_), r(r_), I(I_), type(type_),
-      active(active_) {}
+    : e(e_), x(x_), y(y_), z(z_), r(r_), I(I_), type(type_), active(active_) 
+        #ifdef MPI_A_NEQ_E
+        , ghost(0), r2(r_)
+        #endif
+     {}
 
   particle_sim () {}
   };
@@ -83,6 +91,48 @@ struct hcmp
     { return p1.r>p2.r; }
 };
 
+
+struct render_context{
+  // Camera and colormap
+  vec3 campos, centerpos, lookat, sky;
+  std::vector<COLOURMAP> amap;
+  arr2<COLOUR> pic;
+  tsize npart;
+  tsize npart_all;
+  float b_brightness;
+  int xres;
+  int yres;
+
+#ifdef CUDA
+  int mydevID = -1;
+  // Number of processes using the same GPU
+  int nTasksDev;     
+  cu_cpu_vars cv;
+#endif
+
+#ifdef MPI_A_NEQ_E
+  std::vector<KDnode<particle_sim, 3>* > active_nodes;
+  std::vector<int> composite_order;
+  Box<float,3> bbox;
+  arr2<COLOUR> opacity_map;
+#endif  
+};
+
+void update_res(paramfile& params, render_context& c);
+void do_background(paramfile& params, arr2<COLOUR>& pic, const std::string& outfile);
+
+#ifdef MPI_A_NEQ_E
+bool xcomp_smaller(const particle_sim &p1, const particle_sim &p2);
+bool ycomp_smaller(const particle_sim &p1, const particle_sim &p2);
+bool zcomp_smaller(const particle_sim &p1, const particle_sim &p2);
+float x_accessor(const particle_sim &p1);
+float y_accessor(const particle_sim &p1);
+float z_accessor(const particle_sim &p1);
+float r_accessor(const particle_sim &p1);
+float ghost_accessor(const particle_sim &p1);
+void ghost_setter(particle_sim &p1);
+#endif
+
 template<typename T> struct Normalizer
   {
   T minv, maxv;
@@ -109,6 +159,12 @@ template<typename T> struct Normalizer
       val=T(1);
     else
       val = (max(minv,min(maxv,val))-minv)/(maxv-minv);
+    }
+
+  void reset ()
+    {
+      minv = 1e37;
+      maxv = -1e37;
     }
   };
 
@@ -180,61 +236,7 @@ class work_distributor
       iy = n/nx;
       }
   };
-struct BoundingBox
-{
-  float minX=1e30;
-  float minY=1e30;
-  float minZ=1e30;
-  float maxX=-1e30;
-  float maxY=-1e30;
-  float maxZ=-1e30;
 
-	vec3 centerPoint;
-
-	// Compute and store bounding box parameters
-	void Compute(const std::vector<particle_sim>& pData)
-	{
-		arr<Normalizer<float> > minmax(3);
-		for (unsigned i = 0; i < pData.size(); i++)
-		{
-      if (pData[i].e.r > 0.0 || pData[i].e.g > 0.0 || pData[i].e.b > 0.0)
-      {
-			 minmax[0].collect(pData[i].x);
-			 minmax[1].collect(pData[i].y);
-			 minmax[2].collect(pData[i].z);
-      }
-		}
-
-		//Store and display bounding box of data
-		minX = minmax[0].minv;
-		maxX = minmax[0].maxv;
-		minY = minmax[1].minv;
-		maxY = minmax[1].maxv;
-		minZ = minmax[2].minv;
-		maxZ = minmax[2].maxv;
-
-		centerPoint = vec3((maxX + minX) / 2, (maxY + minY) / 2, (maxZ + minZ) / 2);
-	}
-
-};
-
-enum Face : int
-{
-	FRONT,
-	BACK,
-	LEFT,
-	RIGHT,
-	TOP,
-	BOTTOM
-};
-
-class Camera_Calculator
-{
-private:
-	Face GetFaceEnumFromString(std::string face);
-public:
-	void calculateCameraPosition(BoundingBox box, std::string face, int fov, vec3 &campos, vec3 &lookat, vec3 &sky);
-};
 
 void add_colorbar(paramfile &params, arr2<COLOUR> &pic,
   std::vector<COLOURMAP> &amap);
@@ -246,8 +248,21 @@ void get_colourmaps (paramfile &params, std::vector<COLOURMAP> &amap, VisIVOServ
 #else
 void get_colourmaps (paramfile &params, std::vector<COLOURMAP> &amap);
 #endif
+void replace_colourmap(paramfile &params, std::vector<COLOURMAP> &amap, int itype, std::string);
+void check_palette_format(std::ifstream& infile);
+void composite_images(render_context& c);
+void colour_adjust(paramfile &params, render_context& c);
 double my_asinh (double val);
 bool file_present(const std::string &name);
 void checkrth(float r_th, int npart, std::vector<particle_sim>& p, paramfile &params);
-void checkbbox(std::vector<particle_sim>& p);
+void checkbbox(std::vector<particle_sim>& p, paramfile& params);
+
+// Reader IDs
+enum class SimTypeId: int { NONE = -1, BIN_TABLE = 0, BIN_BLOCK = 1, GADGET = 2, ENZO = 3, GADGET_MILLENIUM = 4, BIN_BLOCK_MPI = 5,
+                            MESH = 6, REGULAR_HDF5 = 7, GADGET_HDF5 = 8, /*No 9,*/ VISIVO = 10, TIPSY = 11 , H5PART = 12, RAMSES = 13, 
+                            BONSAI = 14, ASCII =15, FITS = 16};
+std::string simtype2str(SimTypeId);
+enum FieldId: int { NONE = -1, F_X = 0, F_Y, F_Z, F_CR, F_CG, F_CB, F_R, F_I };
+std::string FieldId2str(FieldId);
+FieldId str2FieldId(std::string str);
 #endif // SPLOTCHUTILS_H

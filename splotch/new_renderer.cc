@@ -19,6 +19,8 @@
  *
  */
 
+#ifndef MPI_A_NEQ_E
+
 #include <memory>
 
 #include "splotch/new_renderer.h"
@@ -637,3 +639,4 @@ tstack_pop("prep");
     }
   tstack_pop("Rendering");
   }
+#endif

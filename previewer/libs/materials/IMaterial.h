@@ -113,6 +113,17 @@ namespace previewer
 		{
 			texture0.SetTexture(newTex, texType);
 		}
+	
+		// Load texture from data buffer
+		void LoadTexture(void* data,int width, int height, GLenum texType, GLenum format, GLenum dataType)
+		{
+			texture0.SetTexture(data, width, height, texType, format, dataType);
+		}
+
+		void ReplaceTexture(void* data, int width, int height)
+		{
+			texture0.ReplaceTextureData(data, width, height);
+		}
 
 		int GetTexWidth()
 		{

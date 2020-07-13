@@ -81,6 +81,7 @@ struct cu_param
   float               zmaxval, zminval;
   bool                col_vector[MAX_P_TYPE];
   float               brightness[MAX_P_TYPE];
+  float               smooth_fac[MAX_P_TYPE];
   bool                log_int[MAX_P_TYPE];
   bool                log_col[MAX_P_TYPE];
   bool                asinh_col[MAX_P_TYPE];
@@ -108,6 +109,7 @@ struct cu_colormap_info
   int                 ptypes;
 };
 
+
 // Variables used by each gpu
 struct cu_gpu_vars 
 {
@@ -133,12 +135,28 @@ struct cu_gpu_vars
 
 };
 
+
+// Context for cuda renderer
+struct cu_cpu_vars
+{
+  cu_gpu_vars gv;
+  CuPolicy* policy;
+  long int len;
+  long int nP;
+  bool initialised;
+  int xres;
+  int yres;
+  COLOUR* buf;
+};
+
+
 void      cu_Device(int devID);
 void      cu_get_trans_params(cu_param &para_trans, paramfile &params, const vec3 &campos, const vec3 &lookat, vec3 &sky, const vec3 &centerpos);
-int       cu_init(long int nP, int ntiles, cu_gpu_vars* pgv, paramfile &fparams, const vec3 &campos, const vec3 &centerpos, const vec3 &lookat, vec3 &sky, float b_brightness, bool& doLogs);
 void      cu_init_colormap(cu_colormap_info info, cu_gpu_vars* pgv);
 int       cu_copy_particles_to_device(cu_particle_sim* h_pd, unsigned int n, cu_gpu_vars* pgv);
 int       cu_range(int nP, cu_gpu_vars* pgv);
+int      cu_allocate(long int nP, int ntiles, cu_gpu_vars* pgv);
+int       cu_init_transform(paramfile &fparams, const vec3 &campos, const vec3 &centerpos, const vec3 &lookat, vec3 &sky, float b_brightness, bool& doLogs);
 
 #ifndef CUDA_FULL_ATOMICS
 int       cu_process(int n, cu_gpu_vars* pgv, int tile_sidex, int tile_sidey, int width, int nxtiles, int nytiles);
@@ -155,5 +173,5 @@ void cu_render(int nP, cu_gpu_vars* pgv);
 
 void      cu_end(cu_gpu_vars* pgv);
 long int  cu_get_chunk_particle_count(cu_gpu_vars* pgv, int nTasksDev, size_t psize, int ntiles, float pfactor);
-
+void      cu_clear_device_img(cu_gpu_vars& pgv);
 #endif

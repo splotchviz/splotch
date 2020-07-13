@@ -290,7 +290,19 @@ int cu_draw_chunk(int mydevID, cu_particle_sim *d_particle_data, int nParticle, 
 
 #endif
 
-int add_device_image(arr2<COLOUR> &Pic_host, cu_gpu_vars* gv, int xres, int yres)
+int get_device_image(arr2<COLOUR> &Pic_host, cu_gpu_vars* gv, int xres, int yres)
+{
+   int res = xres*yres;
+   cudaError_t error = cudaMemcpy(&Pic_host[0][0], gv->d_pic, res * sizeof(cu_color), cudaMemcpyDeviceToHost);
+   if (error != cudaSuccess) 
+  {
+    cout << "Rank " << mpiMgr.rank() << " Image copy: Device Memcpy error!" << endl;
+    printf("cudaMemcpy returned: %s\n",cudaGetErrorString(error));
+    return 0;
+  }
+}
+
+int add_device_image(arr2<COLOUR> &Pic_host, cu_gpu_vars* gv, int xres, int yres, COLOUR* buf)
 {
   int res = xres*yres;
 
@@ -301,11 +313,10 @@ int add_device_image(arr2<COLOUR> &Pic_host, cu_gpu_vars* gv, int xres, int yres
   #endif
   // cout << "Rank " << mpiMgr.rank() << cudaGetErrorString(cudaGetLastError()) << endl;
 
-  COLOUR *Pic = new COLOUR [res];
 
   // Copy back the device image
   tstack_push("Data copy");
-  cudaError_t error = cudaMemcpy(Pic, gv->d_pic, res * sizeof(cu_color), cudaMemcpyDeviceToHost);
+  cudaError_t error = cudaMemcpy(buf, gv->d_pic, res * sizeof(cu_color), cudaMemcpyDeviceToHost);
   if (error != cudaSuccess) 
   {
     cout << "Rank " << mpiMgr.rank() << " Image copy: Device Memcpy error!" << endl;
@@ -316,11 +327,11 @@ int add_device_image(arr2<COLOUR> &Pic_host, cu_gpu_vars* gv, int xres, int yres
 
   // Combine device image with source (may be multiple runs on device)
   tstack_push("combine images");
+  #pragma omp parallel for
   for (int x=0; x<xres; x++)
    for (int y=0; y<yres; y++)
-      Pic_host[x][y] += Pic[x*yres+y];
+      Pic_host[x][y] += buf[x*yres+y];
   tstack_pop("combine images");
 
-  delete[] Pic;
   return 1;
 }

@@ -35,6 +35,8 @@
 	#include "previewer/libs/renderers/PP_GEOM.h"
 #elif defined RENDER_PP_FBO
 	#include "previewer/libs/renderers/PP_FBO.h"
+#elif defined REMOTE_VIEWER
+	#include "previewer/libs/renderers/RemoteViewer.h"
 #endif
 
 // Usage includes
@@ -107,8 +109,10 @@ namespace previewer
 		void ResetCamera();
 		void SetTarget(vec3f t);
 		void SetTargetCenter();
+		void PrintCamera();
 		static std::string GetExePath();
-		
+			// Used to force renderer update
+		static bool rendererUpdated;	
 	private:
 
 		static void Update(bool);
@@ -136,8 +140,7 @@ namespace previewer
 		static int xres;
 		static int yres;
 		
-		// Used to force renderer update
-		static bool rendererUpdated;
+
 
 		// Interaction with simulation render
 		static int moveSpeed;

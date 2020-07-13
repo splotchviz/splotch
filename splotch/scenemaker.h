@@ -10,6 +10,14 @@
 
 #include "cxxsupport/paramfile.h"
 #include "splotch/splotchutils.h"
+#include "reader/IFile.h"
+
+#ifdef MPI_A_NEQ_E
+#ifndef USE_MPI
+#error MPI_A_NEQ_E only available when USE_MPI is set
+#endif
+#include "utils/kdtree.h"
+#endif
 
 class sceneMaker
   {
@@ -35,8 +43,6 @@ class sceneMaker
     paramfile &params;
     int interpol_mode;
     double boxsize;
-	Camera_Calculator camCalc;
-	BoundingBox bbox;
 
     // only used if interpol_mode>0
     std::vector<particle_sim> p1, p2;
@@ -72,6 +78,21 @@ class sceneMaker
   bool getNextScene (std::vector<particle_sim> &particle_data,
       std::vector<particle_sim> &r_points, vec3 &campos, vec3 &centerpos,
       vec3 &lookat, vec3 &sky, std::string &outfile);
+
+  void updateCurrentScene (std::vector<particle_sim> &particle_data, bool new_data = false);
+
+  #ifdef CLIENT_SERVER
+  void unloadData(bool force_dealloc = true);
+  #endif
+  IFile* file = NULL;
+
+#ifdef MPI_A_NEQ_E
+  KDtree<particle_sim, 3> tree;
+  KDtree<particle_sim, 3> tree_orig;
+  void treeInit();
+  Box<float,3> treeBoundingBox(render_context& context);
+  void treeUpdateOpacityRes(arr2<COLOUR>& pic, arr2<COLOUR>& opac);
+#endif
 
 #ifdef MIC
     // Allow mic to know if it should free data

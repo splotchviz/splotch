@@ -31,6 +31,7 @@
 #include "cxxsupport/walltimer.h"
 #include "cxxsupport/sse_utils_cxx.h"
 #include "cxxsupport/string_utils.h"
+#include "cxxsupport/math_utils.h"
 #include "cxxsupport/openmp_support.h"
 #include "splotch/new_renderer.h"
 
@@ -50,8 +51,13 @@ const float32 rfac=0.75;
 const float32 rfac=1.;
 #endif
 
+#ifdef MPI_A_NEQ_E
+void particle_project(paramfile &params, particle_sim* p, tsize npart,
+  const vec3 &campos, const vec3 &lookat, vec3 sky, const vec3 &centerpos, Box<float,3>& bbox, vec3* plane_normals)
+#else
 void particle_project(paramfile &params, vector<particle_sim> &p,
   const vec3 &campos, const vec3 &lookat, vec3 sky, const vec3 &centerpos)
+#endif
   {
   int xres = params.find<int>("xres",800),
       yres = params.find<int>("yres",xres);
@@ -63,7 +69,16 @@ void particle_project(paramfile &params, vector<particle_sim> &p,
   float32 res2 = 0.5f*xres;
   float32 fov = params.find<float32>("fov",45); //in degrees
   float32 fovfct = tan(fov*0.5f*degr2rad);
+#ifndef MPI_A_NEQ_E
   int npart=p.size();
+#endif
+
+  int nt = params.find<int>("ptypes",1);
+  arr<float32> smooth_fac(nt);
+  for(int t=0;t<nt;t++)
+  {
+    smooth_fac[t] = params.find<float32>("smooth_factor"+dataToString(t),1.f);
+  }
 
   sky.Normalize();
   vec3 zaxis = (centerpos-lookat).Norm(); // camera now looks toward negative z
@@ -119,6 +134,9 @@ void particle_project(paramfile &params, vector<particle_sim> &p,
         p[m].x = res2 + xshift         + p[m].x*xfac2;
         p[m].y = res2 + yshift + ycorr + p[m].y*xfac2;
         }
+  #ifdef MPI_A_NEQ_E
+        p[m].r2 = p[m].r;
+  #endif
 
   #ifdef SPLOTCH_CLASSIC
       p[m].I *= 0.5f*bfak/p[m].r;
@@ -127,7 +145,7 @@ void particle_project(paramfile &params, vector<particle_sim> &p,
       p[m].I *= 8.f/(pi*p[m].r*p[m].r*p[m].r); // SPH kernel normalisation
       p[m].I *= (h2sigma*sqrtpi*p[m].r); // integral through the center
   #endif
-      p[m].r *= xfac2;
+      p[m].r *= xfac2 * smooth_fac[p[m].type]; // Smoothing factor
 
       float32 rcorr = sqrt(p[m].r*p[m].r + minrad_pix*minrad_pix)/p[m].r;
       p[m].r*=rcorr;
@@ -158,10 +176,82 @@ void particle_project(paramfile &params, vector<particle_sim> &p,
       p[m].active = true;
     }
   }
+
+#ifdef MPI_A_NEQ_E
+  // Generate transformed plane coordinates and normals for particle bounding box
+  // This is used to cut overlapping particles at boundaries during rendering
+  // First generate box corners
+  vec3 corner[8];
+  corner[0] = vec3(bbox.min[0],bbox.min[1],bbox.max[2]);
+  corner[1] = vec3(bbox.max[0],bbox.min[1],bbox.max[2]);
+  corner[2] = vec3(bbox.min[0],bbox.max[1],bbox.max[2]);
+  corner[3] = vec3(bbox.max[0],bbox.max[1],bbox.max[2]);
+  corner[4] = vec3(bbox.min[0],bbox.min[1],bbox.min[2]);
+  corner[5] = vec3(bbox.max[0],bbox.min[1],bbox.min[2]);
+  corner[6] = vec3(bbox.min[0],bbox.max[1],bbox.min[2]);
+  corner[7] = vec3(bbox.max[0],bbox.max[1],bbox.min[2]);
+
+  // If we wanted the bounding box printed, do that before transforming
+ // bool bbox = params.find<bool>("bbox",false);
+  //
+  // print ...
+
+  // Transform box
+  for(unsigned i = 0; i < 8; i++)
+  {
+    float32 xfac2=xfac;
+    corner[i]=trans.TransPoint(corner[i]);
+
+    if (!projection)
+    {
+      corner[i].x = res2 + corner[i].x*xfac2;
+      corner[i].y = res2 + ycorr + corner[i].y*xfac2;
+    }
+    else
+    {
+      xfac2=-res2/(fovfct*corner[i].z);
+      corner[i].x = res2 + xshift + corner[i].x*xfac2;
+      corner[i].y = res2 + yshift + ycorr + corner[i].y*xfac2;
+    }
+  }
+
+  // Update box corners
+  bbox.min[0] = corner[4].x;
+  bbox.min[1] = corner[4].y;
+  bbox.min[2] = corner[4].z;
+  bbox.max[0] = corner[3].x;
+  bbox.max[1] = corner[3].y;
+  bbox.max[2] = corner[3].z;
+
+  // Generate plane axes
+  vec3 axes[6];
+  axes[0] = corner[1] - corner[3];
+  axes[1] = corner[2] - corner[3];
+  axes[2] = corner[7] - corner[3];
+  axes[3] = corner[0] - corner[4];
+  axes[4] = corner[5] - corner[4];
+  axes[5] = corner[6] - corner[4];
+
+  // Finally generate plane normals
+  // stored xmin,xmax,ymin,ymax,zmin,zmax
+  // or left,right,bottom,top,far,near
+  plane_normals[0] = crossprod(axes[3],axes[5]);
+  plane_normals[1] = crossprod(axes[2],axes[0]);
+  plane_normals[2] = crossprod(axes[3],axes[4]);
+  plane_normals[3] = crossprod(axes[1],axes[2]);
+  plane_normals[4] = crossprod(axes[4],axes[5]);
+  plane_normals[5] = crossprod(axes[1],axes[0]);
+#endif
+
 }
 
+#ifdef MPI_A_NEQ_E
+void particle_colorize(paramfile &params, particle_sim* p, tsize npart,
+  vector<COLOURMAP> &amap, float b_brightness)
+#else
 void particle_colorize(paramfile &params, vector<particle_sim> &p,
   vector<COLOURMAP> &amap, float b_brightness)
+#endif
   {
   int nt = params.find<int>("ptypes",1);
   arr<bool> col_vector(nt);
@@ -173,8 +263,9 @@ void particle_colorize(paramfile &params, vector<particle_sim> &p,
     brightness[t] *= b_brightness;
     col_vector[t] = params.find<bool>("color_is_vector"+dataToString(t),false);
     }
-
+#ifndef MPI_A_NEQ_E
   int npart=p.size();
+#endif
 
 #pragma omp parallel
 {
@@ -195,7 +286,7 @@ void particle_colorize(paramfile &params, vector<particle_sim> &p,
 }
   }
 
-void particle_sort(vector<particle_sim> &p, int sort_type, bool verbose)
+void particle_sort(particle_sim* p, int npart, int sort_type, bool verbose)
   {
   switch(sort_type)
     {
@@ -206,22 +297,22 @@ void particle_sort(vector<particle_sim> &p, int sort_type, bool verbose)
     case 1:
       if (verbose && mpiMgr.master())
         cout << " sorting by z ..." << endl;
-      sort(p.begin(), p.end(), zcmp());
+      sort(&p[0], &p[npart], zcmp());
       break;
     case 2:
       if (verbose && mpiMgr.master())
         cout << " sorting by value ..." << endl;
-      sort(p.begin(), p.end(), vcmp1());
+      sort(&p[0], &p[npart], vcmp1());
       break;
     case 3:
       if (verbose && mpiMgr.master())
         cout << " reverse sorting by value ..." << endl;
-      sort(p.begin(), p.end(), vcmp2());
+      sort(&p[0], &p[npart], vcmp2());
       break;
     case 4:
       if (verbose && mpiMgr.master())
         cout << " sorting by size ..." << endl;
-      sort(p.begin(), p.end(), hcmp());
+      sort(&p[0], &p[npart], hcmp());
       break;
     default:
       planck_fail("unknown sorting chosen ...");
@@ -229,15 +320,21 @@ void particle_sort(vector<particle_sim> &p, int sort_type, bool verbose)
     }
   }
 
-const int chunkdim=100;
 
 //common interface for CPU and GPU version
+// MPI a!=e needs some extra info 
+#ifdef MPI_A_NEQ_E
 void render_new (particle_sim *p, int npart, arr2<COLOUR> &pic,
-  bool a_eq_e, float32 grayabsorb)
+  bool a_eq_e, float32 grayabsorb, int tile_size, Box<float,3>& bbox, vec3* plane_normals, arr2<COLOUR>& opacity_map)
+#else
+void render_new (particle_sim *p, int npart, arr2<COLOUR> &pic,
+  bool a_eq_e, float32 grayabsorb, int tile_size)
+#endif
   {
-  planck_assert(a_eq_e || (mpiMgr.num_ranks()==1),
-    "MPI only supported for A==E so far");
-
+#ifndef MPI_A_NEQ_E
+  planck_assert(a_eq_e || (mpiMgr.num_ranks()==1), "MPI_A_NEQ_E must be enabled in Makefile for MPI a!=e support");
+#endif
+  int chunkdim = tile_size;
   int xres=pic.size1(), yres=pic.size2();
   int ncx=(xres+chunkdim-1)/chunkdim, ncy=(yres+chunkdim-1)/chunkdim;
 
@@ -251,6 +348,9 @@ void render_new (particle_sim *p, int npart, arr2<COLOUR> &pic,
 #endif
 
   pic.fill(COLOUR(0,0,0));
+#ifdef MPI_A_NEQ_E
+  std::vector<float> sintable(90);
+#endif
 
   tstack_push("Host Chunk preparation");
 #pragma omp parallel
@@ -285,6 +385,14 @@ void render_new (particle_sim *p, int npart, arr2<COLOUR> &pic,
         }
       }
     }
+#ifdef MPI_A_NEQ_E
+    // Create sine lookup table before waiting at barrier
+    calcShareGeneral(0,90,nthreads,mythread,lo,hi);
+    for(int i = lo; i < hi; ++i)
+    {
+      sintable[i] = sin(degr2rad*i);
+    }    
+#endif
 #pragma omp barrier
 #pragma omp single
   {
@@ -300,9 +408,23 @@ void render_new (particle_sim *p, int npart, arr2<COLOUR> &pic,
   tstack_replace("Host Chunk preparation","Host Rendering proper");
 
   work_distributor wd (xres,yres,chunkdim,chunkdim);
+  
+  // Logging
+  // int local =0,remote=0;
+  // #pragma omp parallel reduction(+:local,remote)
+
 #pragma omp parallel
 {
   arr<float32> pre1(chunkdim);
+#ifdef MPI_A_NEQ_E
+  arr2<float32> ghost_map(chunkdim,chunkdim);
+#ifdef __SSE2__
+  arr2_align<V4sf,16> lopacmap(chunkdim,chunkdim);
+#else
+  arr2<COLOUR> lopacmap(chunkdim,chunkdim);
+#endif
+#endif
+
 #ifdef __SSE2__
   arr2_align<V4sf,16> lpic(chunkdim,chunkdim);
 #else
@@ -319,8 +441,14 @@ void render_new (particle_sim *p, int npart, arr2<COLOUR> &pic,
     lpic.fast_alloc(x1-x0,y1-y0);
 #ifdef __SSE2__
     lpic.fill(V4sf(0.));
+#ifdef MPI_A_NEQ_E
+    lopacmap.fill(V4sf(0.));
+#endif
 #else
     lpic.fill(COLOUR(0,0,0));
+#ifdef MPI_A_NEQ_E
+    lopacmap.fill(COLOUR(0,0,0));
+#endif
 #endif
     int cx, cy;
     wd.chunk_info_idx(chunk,cx,cy);
@@ -347,6 +475,119 @@ void render_new (particle_sim *p, int npart, arr2<COLOUR> &pic,
         float32 sigma = h2sigma*pp.r;
         float32 stp = -1.f/(sigma*sigma);
 
+#ifdef MPI_A_NEQ_E
+        if(pp.ghost > 0)
+        {
+          bool firstPlane=true;
+          for(int i = 0; i < 6; i++)
+          { 
+            if(pp.ghost & (1<<i))
+            {
+              //   printf("Ghost in plane %i\n",i);
+              // Start at lower corner (minx,miny)
+              // Ray end (pixel), ray normal
+              vec3 R0 = vec3(minx+x0s, miny+y0s,0);
+              vec3 R1 = vec3(minx+x0s, miny+y0s,pp.z);
+              vec3 Rn = vec3(0,0,pp.z);
+              
+              // 
+              float pdotr = dotprod(plane_normals[i], Rn);
+              if(!approx(pdotr,float(0))) 
+              {
+                // LOGGING
+               // if(!(pp.ghost & 1<<7)) 
+               //  {
+               //    remote++;
+               //  }
+               //  else
+               //  {
+               //    local++;
+               //  }
+
+              //  printf("Ghost non-parallel intersect\n");
+                // Non parallel, find intersection
+               for (int x=minx; x<maxx; ++x)
+               {
+                  float32 dx = abs(x-posx);
+                  float32 dxsq=(dx)*(dx);
+                  float32 dy=sqrtf(radsq-dxsq);
+                  int miny2=max(miny,int(posy-dy+1)),
+                      maxy2=min(maxy,int(posy+dy+1));
+                  
+                  for (int y=miny2; y<maxy2; ++y)
+                  {
+                    // Update our ray source
+                    R0.x = x;
+                    R0.y = y;
+                    // Point on plane is either box minimum or maximum, depending on plane idx being odd or even
+                    vec3 plane_coord = (i&1) ? vec3(bbox.min[0],bbox.min[1],bbox.min[2]) : vec3(bbox.max[0],bbox.max[1],bbox.max[2]);
+                    // Intersect plane
+                    vec3 w = R0 - plane_coord;
+                    float t = -dotprod(plane_normals[i],w) / pdotr;
+                    // Tn is distance from plane intersection to particle midplane
+                    float tN = abs(Rn.z * (t-1));
+
+                    // If the local marker bit is 1 it is a local particle that overlaps a plane
+                    // If it is 0 the particle is a remote ghost and we should reverse the sign of tN to get the contribution from the correct side of the plane
+                    if(!(pp.ghost & 1<<7)) 
+                        tN = -tN;
+
+                    // PROBLEM: p.r is in screen space, this is necessary for the sinlut, but tN is in camera space
+                    // Either convert tN to screen space (... how?) or store p.r in camera space... (currently store p.r in camera space - p.r2)
+                    int lu = (1-dx/rfacr)*90; 
+                    if(lu > 89) lu=89;
+                    if(lu < 0) lu = 0;
+                    // hcorr is half distance through particle (radius scaled by distance from particle center via sine table)
+                    float hcorr = pp.r2 * sintable[lu];
+
+                    // If we arent right at the particle edge, work out scale factor
+                    if(hcorr > 0) hcorr = (hcorr + tN) / (2 * hcorr);
+                    else hcorr = 0;
+
+                    if(firstPlane) 
+                      ghost_map[x][y] = hcorr;
+                    else ghost_map[x][y] -= hcorr;
+
+                    if(ghost_map[x][y]<0) ghost_map[x][y]=0.0;
+                    if(ghost_map[x][y]>1) ghost_map[x][y]=1.0;
+                  }
+                }
+              }
+              else
+              {
+                 printf("Warning: Ghost parallel intersection!\n");  
+        /* 
+               // They are plane and ray normals are parallel, check for inside or outside
+               // Do both x and y
+               // Parallel is very hard to achieve because of perspective skew, should test this when rendering interactively
+              
+               for (int x=minx; x<maxx; ++x)
+               {
+                  float32 dxsq=(x-posx)*(x-posx);
+                  float32 dy=sqrt(radsq-dxsq);
+                  int miny2=max(miny,int(posy-dy+1)),
+                      maxy2=min(maxy,int(posy+dy+1));
+                  
+                  for (int y=miny2; y<maxy2; ++y)
+                  {
+                    // i have x and y
+                    // c = contribution 0:1
+                    // a = project (x,y) 
+                    // b = project (min.x,min.y) onto plane_normal[i] 
+                    // c = project (max.x,max.y) onto plane_normal[i]
+                    // if(xor(a>b,a>c)) c = 1;
+                    // else c = 0;
+                    //ghost_map[x][y] = c;
+                  }
+          */            
+              }
+              firstPlane=false;
+            }
+            
+          }
+        }
+#endif
+
         COLOUR a(-pp.e.r,-pp.e.g,-pp.e.b);
 #ifdef __SSE2__
         V4sf va(a.r,a.g,a.b,0.f);
@@ -367,6 +608,9 @@ void render_new (particle_sim *p, int npart, arr2<COLOUR> &pic,
             for (int y=miny2; y<maxy2; ++y)
               {
               float32 att = pre1[y]*pre2;
+              #ifdef MPI_A_NEQ_E
+              if(pp.ghost) att *= ghost_map[x][y];
+              #endif
 #ifdef __SSE2__
               lpic[x][y]+=va*att;
 #else
@@ -397,6 +641,9 @@ void render_new (particle_sim *p, int npart, arr2<COLOUR> &pic,
             for (int y=miny2; y<maxy2; ++y)
               {
               float32 att = pre1[y]*pre2;
+              #ifdef MPI_A_NEQ_E
+              if(pp.ghost) att *= ghost_map[x][y];
+              #endif
 #ifdef __SSE2__
               if ((maxa*att)<taylorlimit)
                 lpic[x][y]+=(lpic[x][y]-vq)*va*att;
@@ -409,10 +656,16 @@ void render_new (particle_sim *p, int npart, arr2<COLOUR> &pic,
                 tmp.d[2] += xexp.expm1(att*a.b)*(tmp.d[2]-q.b);
                 lpic[x][y]=tmp.v;
                 }
+#ifdef MPI_A_NEQ_E
+                lopacmap[x][y] += va*att;
+#endif
 #else
               lpic[x][y].r += xexp.expm1(att*a.r)*(lpic[x][y].r-q.r);
               lpic[x][y].g += xexp.expm1(att*a.g)*(lpic[x][y].g-q.g);
               lpic[x][y].b += xexp.expm1(att*a.b)*(lpic[x][y].b-q.b);
+#ifdef MPI_A_NEQ_E
+                lopacmap[x][y] += a*att;
+#endif
 #endif
               }
             }
@@ -425,13 +678,21 @@ void render_new (particle_sim *p, int npart, arr2<COLOUR> &pic,
         {
         COLOUR &c(pic[ix+x0s][iy+y0s]); float32 dum;
         lpic[ix][iy].writeTo(c.r,c.g,c.b,dum);
+#ifdef MPI_A_NEQ_E
+        COLOUR &a(opacity_map[ix+x0s][iy+y0s]);
+        lopacmap[ix][iy].writeTo(a.r,a.g,a.b,dum);
+#endif
         }
 #else
         pic[ix+x0s][iy+y0s]=lpic[ix][iy];
+#ifdef MPI_A_NEQ_E
+        opacity_map[ix+x0s][iy+y0s]=lopacmap[ix][iy];
+#endif
 #endif
     } // for this chunk
 } // #pragma omp parallel
-
+  // LOGGING 
+  // if(mpiMgr.rank()==0) printf("Rank 0: local ghosts %i remote ghosts %i\n", local, remote);
   tstack_pop("Host Rendering proper");
   }
 
@@ -439,44 +700,67 @@ void render_new (particle_sim *p, int npart, arr2<COLOUR> &pic,
 
 using namespace host_funct;
 
-void host_rendering (paramfile &params, vector<particle_sim> &particles,
-  arr2<COLOUR> &pic, const vec3 &campos, const vec3 &centerpos,
-  const vec3 &lookat, const vec3 &sky,
-  vector<COLOURMAP> &amap, float b_brightness, tsize npart_all)
+
+// #ifdef MPI_A_NEQ_E
+// void host_rendering (paramfile &params, particle_sim* particles,
+//   arr2<COLOUR> &pic, const vec3 &campos, const vec3 &centerpos,
+//   const vec3 &lookat, const vec3 &sky,
+//   vector<COLOURMAP> &amap, float b_brightness, tsize npart, tsize npart_all, Box<float,3> bbox, arr2<COLOUR>& opacity_map)
+// {
+// #else
+void host_rendering (paramfile &params, vector<particle_sim> &particles, render_context &rc)
   {
+   
   if (params.find<bool>("new_renderer", false))
     {
-    host_rendering_new(params, particles, pic, campos, centerpos, lookat, sky,
-      amap, b_brightness, npart_all);
+    #ifdef MPI_A_NEQ_E
+       // MPI_A_EQ_E doesnt support new renderer
+    planck_fail("MPI_A_NEQ_E mode does not support new_renderer=true param\n");
+    #endif
+    host_rendering_new(params, particles, rc.pic, rc.campos, rc.centerpos, rc.lookat, rc.sky,
+      rc.amap, rc.b_brightness, rc.npart_all);
     return;
     }
 
   bool master = mpiMgr.master();
-  tsize npart = particles.size();
-  //tsize npart_all = npart;
-  //mpiMgr.allreduce (npart_all,MPI_Manager::Sum);
 
+#ifndef MPI_A_NEQ_E
+  // No need to checkbox for MPI_A_NEW_E
   bool bbox = params.find<bool>("bbox",false);
   if(bbox)
-    checkbbox(particles);
+    checkbbox(particles, params);
+#endif
+
 // -------------------------------------
 // ----------- Transforming ------------
 // -------------------------------------
   tstack_push("3D transform");
-  if (master)
-    cout << endl << "host: applying geometry (" << npart_all << ") ..." << endl;
-  particle_project(params, particles, campos, lookat, sky, centerpos);
+  //if (master)
+  //  cout << endl << "host: applying geometry (" << npart_all << ") ..." << endl;
+  #ifdef MPI_A_NEQ_E
+  vec3 plane_normals[6];
+  particle_project( params, particles, rc.npart, rc.campos, rc.lookat, rc.sky, 
+                    rc.centerpos, rc.bbox, plane_normals);
+  #else
+  particle_project(params, particles, rc.campos, rc.lookat, rc.sky, rc.centerpos);
+  #endif
   tstack_replace("3D transform","Particle coloring");
 
 
 // ------------------------------------
 // ----------- Coloring ---------------
 // ------------------------------------
-  if (master)
-    cout << endl << "host: calculating colors (" << npart_all << ") ..." << endl;
-  particle_colorize(params, particles, amap, b_brightness);
+  //if (master)
+  //  cout << endl << "host: calculating colors (" << npart_all << ") ..." << endl;
+#ifdef MPI_A_NEQ_E
+  particle_colorize(params, particles, rc.npart, rc.amap, rc.b_brightness);
+#else
+  particle_colorize(params, particles, rc.amap, rc.b_brightness);
+#endif
   tstack_pop("Particle coloring");
+#ifdef MPI_A_NEQ_E
 
+#else
 // ------------------------------------
 // ----------- Distribution -----------
 // ------------------------------------
@@ -486,9 +770,10 @@ void host_rendering (paramfile &params, vector<particle_sim> &particles,
   if(r_th != 0.0)
   {
     tstack_push("rth distribution");
-    checkrth(r_th, npart, particles, params);
+    checkrth(r_th, rc.npart, particles, params);
     tstack_pop("rth distribution");
   }
+#endif
 
 #if 0
 // ------------------------------------
@@ -523,23 +808,28 @@ void host_rendering (paramfile &params, vector<particle_sim> &particles,
     if (master)
       (mpiMgr.num_ranks()>1) ?
         cout << endl << "host: applying local sort ..." << endl :
-        cout << endl << "host: applying sort (" << npart << ") ..." << endl;
+        cout << endl << "host: applying sort (" << rc.npart << ") ..." << endl;
     int sort_type = params.find<int>("sort_type",1);
-    particle_sort(particles,sort_type,true);
+    particle_sort(&particles[0],rc.npart,sort_type,true);
     }
   tstack_pop("Particle sorting");
 
 // ------------------------------------
 // ----------- Rendering ---------------
 // ------------------------------------
-  if (master)
-    cout << endl << "host: rendering (" << npart_all << "/" << npart_all << ")..." << endl;
+  //if (master)
+  //  cout << endl << "host: rendering (" << npart_all << "/" << npart_all << ")..." << endl;
 
   bool a_eq_e = params.find<bool>("a_eq_e",true);
   float32 grayabsorb = params.find<float32>("gray_absorption",0.2);
+  int tile_size = params.find<float32>("tile_size_cpu",50);
 
   tstack_push("Rendering");
-  render_new (&(particles[0]),particles.size(),pic,a_eq_e,grayabsorb);
+#ifdef MPI_A_NEQ_E
+  render_new (particles,rc.npart,rc.pic,a_eq_e,grayabsorb, tile_size, rc.bbox, plane_normals, rc.opacity_map);
+#else
+  render_new (&(particles[0]),rc.npart,rc.pic,a_eq_e,grayabsorb,tile_size);
+#endif
   tstack_pop("Rendering");
   }
 

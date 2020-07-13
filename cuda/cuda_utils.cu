@@ -117,10 +117,9 @@ void cu_get_trans_params(cu_param &para_trans, paramfile &params, const vec3 &ca
   para_trans.rfac=rfac;
 }
 
-
-int cu_init(long int nP, int ntiles, cu_gpu_vars* pgv, paramfile &fparams, const vec3 &campos, const vec3 &centerpos, const vec3 &lookat, vec3 &sky, float b_brightness, bool& doLogs)
+int cu_allocate(long int nP, int ntiles, cu_gpu_vars* pgv)
 {
-  cudaError_t error;
+ cudaError_t error;
  
   // particle vector  
   size_t size = nP * sizeof(cu_particle_sim);
@@ -206,6 +205,18 @@ int cu_init(long int nP, int ntiles, cu_gpu_vars* pgv, paramfile &fparams, const
 #endif 
 #endif
   
+  if (error != cudaSuccess)
+  {
+    cout << "Device Malloc: initial allocation error!" << endl;
+    cout << "Error: " << cudaGetErrorString(error) << std::endl;
+    return 1;
+  }
+  return 0;
+}
+
+int cu_init_transform(paramfile &fparams, const vec3 &campos, const vec3 &centerpos, const vec3 &lookat, vec3 &sky, float b_brightness, bool& doLogs)
+{
+  cudaError_t error;
   //retrieve parameters
   cu_param tparams;
   cu_get_trans_params(tparams,fparams,campos,lookat,sky,centerpos);
@@ -218,6 +229,7 @@ int cu_init(long int nP, int ntiles, cu_gpu_vars* pgv, paramfile &fparams, const
   {
     tparams.brightness[itype] = fparams.find<double>("brightness"+dataToString(itype),1.);
     tparams.brightness[itype] *= b_brightness;
+    tparams.smooth_fac[itype] = fparams.find<double>("smooth_factor"+dataToString(itype),1.);
     tparams.col_vector[itype] = fparams.find<bool>("color_is_vector"+dataToString(itype),false);
     tparams.log_col[itype] = fparams.find<bool>("color_log"+dataToString(itype),false);
     tparams.log_int[itype] = fparams.find<bool>("intensity_log"+dataToString(itype),false);
@@ -241,6 +253,8 @@ int cu_init(long int nP, int ntiles, cu_gpu_vars* pgv, paramfile &fparams, const
   }
   return 0;
 }
+
+
 
 void cu_init_colormap(cu_colormap_info h_info, cu_gpu_vars* pgv)
 {
@@ -419,6 +433,12 @@ long int cu_get_chunk_particle_count(cu_gpu_vars* pgv, int nTasksDev, size_t psi
 
    if (len > maxlen) len = maxlen;
    return len;
+}
+
+void cu_clear_device_img(cu_gpu_vars& pgv)
+{
+  int size = pgv.policy->GetImageSize();
+  cudaMemset(pgv.d_pic,0,size);
 }
 
 

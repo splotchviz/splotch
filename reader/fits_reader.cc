@@ -40,7 +40,7 @@ void fits_reader(paramfile &params, std::vector<particle_sim> &points)
     long     *dims, *fpixel;
     fitsfile *fitsptr; // FITS file pointer
     float rrr;
-    int64 mybegin, myend, npart, npart_total;
+    int64 mybegin, npart, npart_total;
     
     if (mpiMgr.master())
         cout << "FITS DATA" << endl;
@@ -73,16 +73,15 @@ void fits_reader(paramfile &params, std::vector<particle_sim> &points)
         cout << "Number of slices " << dims[2] << endl;
         cout << "Number of pixels " << npart_total << endl;
     }
-    
-#ifdef USE_MPI
+    int64 myend;
     mpiMgr.calcShare (0, dims[2], mybegin, myend);
-#else
+    npart = (myend-mybegin)*dims[0]*dims[1];
+    points.resize(npart);
+ 
+    
     mybegin = params.find<int>("cube_begin",mybegin);
     myend = params.find<int>("cube_end",myend);
     cout << "Selected slice range: " << mybegin << " - " << myend << endl;
-#endif
-    npart = (myend-mybegin)*dims[0]*dims[1];
-    points.resize(npart);
     
     // Read in each slice in the FITS cube
     fpixel = (long*)calloc(naxes, sizeof(long));

@@ -36,12 +36,18 @@ namespace previewer
 	{
 	public:
 		//Public methods
+ 
+ 		// Set texture from file source
+		void SetTexture(std::string, GLenum type);
+ 
+ 		// Set texture from premade texture
+		void SetTexture(GLuint&, GLenum type);
 
-		// Set texture from file source
-		void SetTexture(std::string, GLenum);
+		// Set/replace texture from input data buffer
+		void SetTexture(void* data, int _width, int _height, GLenum _texType, GLenum _format, GLenum _dataType);
+		void ReplaceTextureData(void* data, int _width, int _height);
 
-		// Set texture from premade texture
-		void SetTexture(GLuint&, GLenum);
+
 		void Bind();
 		void Unbind();
 
@@ -49,9 +55,13 @@ namespace previewer
 		int GetHeight();
 
 	private:
-		//Private variables
 		GLuint 	texID;
+		// 2D or 3D texture
 		GLenum 	texType;
+		// Pixel format
+		GLenum 	format;
+		// GL_UNSIGNED_BYTE, GL_FLOAT etc
+		GLenum 	dataType;
 		int 	width;
 		int 	height;
 		int 	bpp;

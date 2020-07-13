@@ -32,7 +32,7 @@ namespace previewer
 		unsigned char* imageData = FileLib::loadTGAFile(filename, width, height, bpp);
 
 		// Check for alpha, if so set appropriate format for glteximage2d 
-		GLenum format = (bpp == 32) ? GL_RGBA : GL_RGB;
+		format = (bpp == 32) ? GL_RGBA : GL_RGB;
 
 		// Check width and height set properly on load
 		DebugPrint("Texture: w %i, h %i, bpp %i\n",width, height, bpp);
@@ -60,6 +60,38 @@ namespace previewer
 	{
 		texID = newTex;
 		texType = type;
+	}
+	
+	// Set texture from input data buffer
+	void Texture::SetTexture(void* data, int _width, int _height, GLenum _texType, GLenum _format, GLenum _dataType)
+	{
+		texType = _texType;
+		width = _width;
+		height = _height;
+		format = _format;
+		dataType = _dataType;
+
+		// Gl generate texture
+		glGenTextures(1, &texID);
+
+
+		// Bind
+		glBindTexture(texType, texID);
+		// Set texture parameters
+		glTexParameteri(texType, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(texType, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(texType, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(texType, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		// Create texture from loaded data. args: target/level/internal format/width/height/border/format/type/data
+		glTexImage2D(texType, 0, format, width, height, 0, format, dataType, data);
+		glBindTexture(texType, 0);
+	}
+
+	void Texture::ReplaceTextureData(void* data, int _width, int _height)
+	{
+		glBindTexture(texType, texID);
+		glTexSubImage2D(texType, 0, 0, 0, width, height, format, dataType, data);
+		glBindTexture(texType, 0);
 	}
 
 	void Texture::Bind()

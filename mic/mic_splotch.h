@@ -41,6 +41,7 @@
 //#endif
 #pragma offload_attribute(pop)
 
+void mic_init_offload();
 void mic_allocate(mic_soa_particles&, std::vector<particle_sim>&, paramfile&);
 void mic_rendering(paramfile&, std::vector<particle_sim>&, arr2<COLOUR>&, const vec3&, const vec3&,const vec3&, const vec3&, std::vector<COLOURMAP>&, float, mic_soa_particles&, bool);
 const float* compute_transform(paramfile&, transform_data&, const vec3&, const vec3&, const vec3&, vec3); 

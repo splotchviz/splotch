@@ -41,6 +41,24 @@ namespace{
 EVT_TARGET_MIC mic_color_map micmap;
 }
 
+void mic_init_offload()
+{
+  // Init mic omp threads with empty offload 
+  // (if not already done by environment variable)
+  // Do this asynchrnously
+  #pragma offload_transfer target(mic:0)
+
+  #pragma offload target(mic:0)
+  {
+    // Initialise openmp threads
+    #pragma omp parallel
+    {
+
+    }
+  }
+}
+
+
 void mic_allocate(mic_soa_particles& msp, std::vector<particle_sim>& p, paramfile& params)
 {
 	// Work out how many particles to process

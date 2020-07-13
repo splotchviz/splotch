@@ -57,6 +57,7 @@ namespace previewer
 			AddCommand("write scenefile", &GUICommand::WriteSceneFile, 1);
 			AddCommand("set param", &GUICommand::SetParam, 2);
 			AddCommand("get param", &GUICommand::GetParam, 1);
+			AddCommand("print camera", &GUICommand::PrintCamera, 0);
 
 			// Scene manipulation
 			AddCommand("set palette", &GUICommand::SetPalette, 2);
@@ -86,7 +87,9 @@ namespace previewer
 		}
 		void GUICommand::HandleKeyEvent(Event ev, Previewer& pv)
 		{
-			if(ev.keyID == "#")
+
+
+			if(ev.keyID[0] == '#')		
 			{
 				SimpleGUI::guiActive = !SimpleGUI::guiActive;
 				currentCommandLine = "";
@@ -101,10 +104,6 @@ namespace previewer
 				else if(ev.keyID == "BACKSPACE")
 				{
 					currentCommandLine = currentCommandLine.substr(0, currentCommandLine.size()-1);
-				}
-				else if(ev.keyID == "SPACE")
-				{
-					currentCommandLine += " ";
 				}
 				else if(ev.keyID == "UP")
 				{
@@ -289,7 +288,13 @@ namespace previewer
 		{
 				//currentCommandLine.clear();
 				isTerminating = true;
-				pv.TriggerOnQuitApplicationEvent();			
+				Event ev;
+// #ifdef CLIENT_SERVER
+// 				ev.id = evQuitApplication;
+// #else
+				ev.eventType = evQuitApplication;
+//#endif
+				pv.TriggerOnQuitApplicationEvent(ev);			
 		}
 
 		// Pipe to command line
@@ -479,6 +484,13 @@ namespace previewer
 				currentCommandLine = args[0]+"="+param;
 			}
 		}
+		
+		void GUICommand::PrintCamera(Previewer& pv, std::vector<std::string> args)
+		{	
+			if(args.size() != 0)	currentCommandLine = "error: print camera takes 0 arguments";
+			else 					pv.PrintCamera();
+		}
+
 		//--------------------------------------------------------------------------------
 		// Scene manipulation
 		void GUICommand::SetPalette(Previewer& pv, std::vector<std::string> args)

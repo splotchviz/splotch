@@ -197,7 +197,7 @@ namespace previewer
 		{
 			DebugPrint("Working out segment length\n");
 			// Get length of segment (time between point[n] and point[n+1]) as percentage of total time
-			float segmentLength = abs(DPLF[i].time - DPLF[i+1].time);
+			float segmentLength = fabs(DPLF[i].time - DPLF[i+1].time);
 
 			float percentageOfTotal = 0;
 			if(AnimationData::GetMaxAnimationTime() > 0 && segmentLength > 0)

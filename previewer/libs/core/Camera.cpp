@@ -35,7 +35,10 @@ namespace previewer
 	{
 		return cameraUpVector;
 	}
-
+	vec3f Camera::GetTarget()
+	{
+		return cameraTarget;
+	}
 	void Camera::SetLookAt(vec3f target)
 	{
 		// Calculate relative direction from the current position
@@ -59,6 +62,17 @@ namespace previewer
 		cameraFieldOfView = fov;
 		return;
 	}
+	
+	void Camera::SetMaxAcceleration(vec3f ma)
+	{
+		maxAcceleration = ma;
+	}
+
+	void Camera::SetMaxSpeed(vec3f ms)
+	{
+		maxSpeed = ms;
+	}
+
 
 	void Camera::Create(BoundingBox box)
 	{
@@ -79,6 +93,7 @@ namespace previewer
 		// Set cameras position, up vector and fov (no modifications needed here)
 		cameraPosition = position;
 		cameraUpVector = up;
+		velocity = vec3f(0,0,0);
 
 		// Set the look at point for the camera (the cameras right vector is calculated here!)
 		SetTarget(lookAt);
@@ -324,6 +339,35 @@ namespace previewer
 		SetLookAt(cameraTarget);
 	}
 
+	void Camera::RotateTargetAround(float yaw, float pitch, float roll)
+	{
+		Matrix4 rotationMtxH;
+		Matrix4 rotationMtxP;
+
+		vec3f focusVector = cameraTarget - cameraPosition;
+
+		if(yaw != 0.0f)
+		{
+			rotationMtxH.rotate(cameraUpVector, yaw);
+			focusVector = focusVector * rotationMtxH;
+		}
+
+		if(pitch != 0.0f)
+		{
+			rotationMtxP.rotate(cameraRightVector, pitch);
+			focusVector = focusVector * rotationMtxP;
+		}
+
+		if(roll != 0.0f)
+		{
+			// Ignore roll for now
+		}
+
+		cameraTarget = focusVector + cameraPosition;
+
+		SetLookAt(cameraTarget);
+	}
+
 	void Camera::Move(vec3f movement)
 	{
 		// Move the camera relative to world axes
@@ -341,7 +385,7 @@ namespace previewer
 	void Camera::MoveForward(float distance)
 	{
 		// Transform movement relative to local axes 
-		cameraPosition -= cameraLookAt * distance;
+		cameraPosition += cameraLookAt * distance;
 		return;
 	}
 	void Camera::MoveUpward(float distance)
@@ -355,6 +399,105 @@ namespace previewer
 		// Transform movement relative to local axes 
 		cameraPosition += cameraRightVector * distance;
 		return;
+	}
+
+	void Camera::MoveCamAndTargetForward(float distance)
+	{
+		// Transform movement relative to local axes 
+		cameraPosition += cameraLookAt * distance;
+		cameraTarget += cameraLookAt * distance;
+		return;
+	}
+	void Camera::MoveCamAndTargetUpward(float distance)
+	{
+		// Transform movement relative to local axes 
+		cameraTarget += cameraUpVector * distance;
+		return;
+	}
+	void Camera::MoveCamAndTargetRight(float distance)
+	{
+		// Transform movement relative to local axes 
+		cameraTarget += cameraRightVector * distance;
+		return;
+	}
+
+	void Camera::MoveTargetForward(float distance)
+	{
+		// Transform movement relative to local axes 
+		cameraTarget += cameraLookAt * distance;
+		return;
+	}
+	void Camera::MoveTargetUpward(float distance)
+	{
+		// Transform movement relative to local axes 
+		cameraTarget += cameraUpVector * distance;
+		return;
+	}
+	void Camera::MoveTargetRight(float distance)
+	{
+		// Transform movement relative to local axes 
+		cameraTarget += cameraRightVector * distance;
+		return;
+	}
+
+	void Camera::AccelForward(float amount)
+	{
+		// Transform movement relative to local axes 
+		acceleration.z += amount;
+		if(acceleration.z > maxAcceleration.z)
+			acceleration.z = maxAcceleration.z;
+		return;
+	}
+
+	void Camera::AccelUpward(float amount)
+	{
+		// Transform movement relative to local axes 
+		acceleration.y += amount;
+		if(acceleration.y > maxAcceleration.y)
+			acceleration.y = maxAcceleration.y;
+		return;
+	}
+
+	void Camera::DecelForward(float amount)
+	{
+		// z *= 0.x
+	}
+
+	void Camera::DecelUpward(float amount)
+	{
+
+	}
+
+	void Camera::DecelRight(float amount)
+	{
+
+	}
+
+	void Camera::AccelRight(float amount)
+	{
+		// Transform movement relative to local axes 
+		acceleration.x += amount;
+		if(acceleration.x > maxAcceleration.x)
+			acceleration.x = maxAcceleration.x;
+		return;
+	}
+
+	void Camera::UpdateSpeed()
+	{
+		speed += acceleration;
+		if(speed.x > maxSpeed.x) speed.x = maxSpeed.x;
+		if(speed.y > maxSpeed.y) speed.y = maxSpeed.y;
+		if(speed.z > maxSpeed.z) speed.z = maxSpeed.z;
+	}
+
+	void Camera::UpdateVelocity()
+	{
+		velocity = (cameraLookAt * speed.z) + (cameraUpVector * speed.y) + (cameraRightVector * speed.x);
+	}
+
+	void Camera::UpdatePosition()
+	{
+		cameraPosition += velocity;
 	}
 
 	void Camera::SetFocusState(bool newFocus)
@@ -475,7 +618,7 @@ namespace previewer
 		// exit(0);
 		return;
 	}
-
+#ifndef CLIENT_SERVER
 	void Camera::ActionMoveCameraPosition(vec3f newPosition, int type)
 	{
 		switch(type)
@@ -526,6 +669,6 @@ namespace previewer
 			CameraActionUnsubscribe();
 		}
 	}
-
+#endif
 
 }

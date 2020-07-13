@@ -152,7 +152,7 @@ __global__ void k_process(cu_particle_sim *p, int n, int mapSize, int types)
   I *= 8.f*dparams.h2sigma/(sqrtf(Pi)*r*r);
 #endif
 
-  r *= xfac2;
+  r *= xfac2 * dparams.smooth_fac[ptype];
   const float rcorr= sqrtf(r*r + dparams.minrad_pix*dparams.minrad_pix)/r;
   r *= rcorr;
 #ifdef SPLOTCH_CLASSIC

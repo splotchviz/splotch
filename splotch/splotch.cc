@@ -51,7 +51,17 @@
 #include <string>
 #endif
 
+#ifdef MPI_A_NEQ_E
+#include "utils/composite.h"
+#endif
+
+#ifdef CLIENT_SERVER
+#include "server/server.h"
+#endif
+
+
 using namespace std;
+
 #ifdef SPLVISIVO
 int splotchMain (VisIVOServerOptions opt)
 #else
@@ -59,7 +69,7 @@ int main (int argc, const char **argv)
 #endif
   {
 
-#ifdef PREVIEWER
+#ifdef PREVIEWER 
   bool pvMode=false;
   int paramFileArg=-1;
   for (int i=0; i<argc; i++)
@@ -101,20 +111,13 @@ int main (int argc, const char **argv)
     if (file_present("stop")) remove("stop");
 
 #ifdef SPLVISIVO
+  // If Splotch is running within visivo, use parameters 
+  // passed from visivo and initialize the paramfile 
   planck_assert(!opt.splotchpar.empty(),"usage: --splotch <parameter file>");
   paramfile params (opt.splotchpar.c_str(),true);
-  params.setParam("camera_x",opt.spPosition[0]);
-  params.setParam("camera_y",opt.spPosition[1]);
-  params.setParam("camera_z",opt.spPosition[2]);
-  params.setParam("lookat_x",opt.spLookat[0]);
-  params.setParam("lookat_y",opt.spLookat[1]);
-  params.setParam("lookat_z",opt.spLookat[2]);
-  params.setParam("outfile",visivoOpt->imageName);
-  params.setParam("interpolation_mode",0);
-  params.setParam("simtype",10);
-  params.setParam("fov",opt.spFov);
-  params.setParam("ptypes",1);
+  splvisivo_init_params(params, opt);
 #else
+  // Print startup message and read parameter file
   module_startup ("splotch",argc,argv,2,"<parameter file>",master);
   paramfile params (argv[1],false);
 
@@ -123,150 +126,141 @@ int main (int argc, const char **argv)
     "\"geometry_file\" ... ");
 #endif
 
-  vector<particle_sim> particle_data; //raw data from file
+    // Raw particle data
+  vector<particle_sim> particle_data;
+  // Filtered data
   vector<particle_sim> r_points;
+  // Create our rendering context
+  render_context context;
 
-// Many Integrated Core Initialisation
+// Knights Corner MIC Initialization
 #ifdef MIC
   tstack_push("Init mic");
-  // Init mic device with empty offload
-  // (if not already done by environment variable)
-  #pragma offload_transfer target(mic:0)
-
-  #pragma offload target(mic:0)
-  {
-    // Initialise openmp threads
-    #pragma omp parallel
-    {
-
-    }
-  }
+  mic_init_offload();
+    // Struct to hold reformatted particle data
+  // Only used for Intel Xeon Phi offload model
+  mic_soa_particles soa_particles;
   tstack_pop("Init mic");
 #endif
 
-// CUDA/OPENCP Initialisation
-#if (!defined(OPENCL))
-  vec3 campos, centerpos, lookat, sky;
-  vector<COLOURMAP> amap;
-#else
-  ptypes = params.find<int>("ptypes",1);
-  g_params =&params;
-#endif
-#if (defined(CUDA) || defined(OPENCL))
-  int myID = mpiMgr.rank();
-  int nDevNode = check_device(myID);     // number of GPUs available per node
-  int mydevID = -1;
-  int nTasksDev;     // number of processes using the same GPU
+// CUDA Initialization
 #ifdef CUDA
-  // We assume a geometry where processes use only one gpu if available
-  //int nDevProc = 1;   // number of GPU required per process (unused)
-  int nTasksNode = 1 ; //number of processes per node (=1 default configuration)
-  if (nDevNode > 0)
-    {
-#ifdef HYPERQ
-    // all processes in the same node share one GPU
-    mydevID = 0;
-    nTasksNode = params.find<int>("tasks_per_node",1); //number of processes per node
-    nTasksDev = nTasksNode;
-    if (master) cout << "HyperQ enabled" << endl;
-#else
-    // only the first nDevNode processes of the node will use a GPU, each exclusively.
-    nTasksNode = params.find<int>("tasks_per_node",1); //number of processes per node
-    mydevID = myID%nTasksNode; //ID within the node
-    nTasksDev = 1;
-    if (master)
-    {
-       cout << "Configuration supported is 1 gpu for each mpi process" << endl;
-       cout << "Each node has " << nTasksNode << " ranks, and " << nDevNode << " gpus." << endl;
-    }
-    if (mydevID>=nDevNode)
-      {
-      cout << "There isn't a gpu available for process = " << myID << " computation will be performed on the host" << endl;
-      mydevID = -1;
-      }
+  // Initialize our render context for CUDA rendering
+  cuda_rendercontext_init(params, context);
 #endif
-    }
-   else planck_fail("No GPUs are available");
-#endif
-#ifdef OPENCL
-  // all processes use a number of GPUs >= 1 and <= nDevNode
-  int nDevProc = params.find<int>("gpu_number",1);
-  if (nDevProc > nDevNode)
-  {
-    if (master)
-    {
-      cout << "Number of GPUs available = " << nDevNode << " is lower than the number of GPUs required " << nDevProc << endl;
-      cout << "Only " << nDevNode << " GPUs will be used per process" << endl;
-    }
-  }
-#endif
-  bool gpu_info = params.find<bool>("gpu_info",true);
-  if (gpu_info)
-    if (mydevID>=0) print_device_info(myID, mydevID);
-#endif // CUDA || OPENCL
 
+// Colormap initilalization
 #ifdef SPLVISIVO
-  get_colourmaps(params,amap,opt);
+  get_colourmaps(params,context.amap,opt);
 #else
-  get_colourmaps(params,amap);
+  get_colourmaps(params,context.amap);
 #endif
 
-#ifdef MIC
-  // Struct to hold reformatted particle data
-  // Only used for Intel Xeon Phi offload model
-  mic_soa_particles soa_particles;
+
+  // Initialize the scene
+  string outfile;
+  sceneMaker sMaker(params); 
+  update_res(params, context);
+
+// Tree setup for MPI a!=e
+#ifdef MPI_A_NEQ_E
+  if(mpiMgr.num_ranks()>1)
+  {
+    sMaker.treeInit();
+  }
+#endif  
+
+// Server initialization
+#ifdef CLIENT_SERVER
+  SplotchServer server;
+  bool splotch_is_server = params.find<bool>("server", false);
+  if(splotch_is_server) server.init(params,master);
+  else if(master)  printf("Splotch server mode off\n");  
 #endif
 
   tstack_pop("Setup");
-  string outfile;
 
-  sceneMaker sMaker(params);
-  while (sMaker.getNextScene (particle_data, r_points, campos, centerpos, lookat, sky, outfile))
-    {
+// Server takes over execution if enabled
+#ifdef CLIENT_SERVER
+  if(splotch_is_server) 
+  {
+    server.run(sMaker, particle_data, r_points, context);
+    server.finalize();
+    tstack_pop("Splotch");
+    return 0;
+  }
+  else if(master) 
+    printf("Splotch server mode off, set <server=TRUE> in paramfile to turn it on\n");  
+#endif
+
+
+  // Render loop
+  while(sMaker.getNextScene (particle_data, r_points, context.campos, context.centerpos, context.lookat, context.sky, outfile))
+  {
+    // Check for image resolution update
+    update_res(params, context); 
+
     bool a_eq_e = params.find<bool>("a_eq_e",true);
-    int xres = params.find<int>("xres",800),
-        yres = params.find<int>("yres",xres);
-    arr2<COLOUR> pic(xres,yres);
 
-    bool background = params.find<bool>("background",false);
-    if(background)
-      {
-	if (master)
-	  {
-	    cout << endl << "reading file Background/" << outfile << " ..." << endl;
-	    
-	    LS_Image img;
-	    img.read_TGA("Background/"+outfile+".tga");
+#ifdef MPI_A_NEQ_E
+    if(mpiMgr.num_ranks() > 1)
+    {
+      // Update opacity map res to match image
+      sMaker.updateOpacityRes(context.pic, context.opacity_map);
+      // Get bounding box from tree to give to renderer
+      context.bbox = sMaker.treeBoundingBox(); 
+    }
+#endif
 
-#pragma omp parallel for
-	    for (tsize i=0; i<pic.size1(); ++i)
-	      for (tsize j=0; j<pic.size2(); ++j)
-		{
-                  Colour8 c=img.get_pixel(i,j);
-		  pic[i][j].r=c.r/256.0;
-		  pic[i][j].g=c.g/256.0;
-		  pic[i][j].b=c.b/256.0;
-		}
-	  }
-	mpiMgr.bcastRaw(&pic[0][0].r,3*xres*yres);
-      }
-
-    tsize npart = particle_data.size();
+    // Apply a background, commented because doesnt work
+    // as the bg is overwritten during OpenMP tiled rendering
+    // do_background(params, pic, outfile, master);
+    
+#ifdef MPI_A_NEQ_E
+    // For MPI a!=e we need to consider the additional ghost particles
+    if(mpiMgr.num_ranks()>1)  
+      context.npart = context.active_nodes[0]->local_size + context.active_nodes[0]->merged_ghosts;
+    else                      
+      context.npart = particle_data.size();
+#else
+    context.npart = particle_data.size();
+#endif
 
     // Calculate boost factor for brightness
     bool boost = params.find<bool>("boost",false);
-    float b_brightness = boost ?
-      float(npart)/float(r_points.size()) : 1.0;
-
-    if(npart>0)
+    context.b_brightness = boost ?
+    float(context.npart)/float(r_points.size()) : 1.0;
+    
+    //server.ft.mark(5, "Setup: ");
+    //server.ft.start(3);
+    if(context.npart>0)
     {
-      // Use correct vector dependant on boost usage
-      std::vector<particle_sim>* pData;
-      if (boost) pData = &r_points;
-      else       pData = &particle_data;
+       //("Npart>0: Rendering!\n");
+#ifdef MPI_A_NEQ_E
+        particle_sim* pData;
 
-       tsize npart_all = npart;
-       mpiMgr.allreduce (npart_all,MPI_Manager::Sum);
+        if(mpiMgr.num_ranks()>1)
+        {
+            pData = active_nodes[0]->data;
+            // Determine composite order before transformation
+            particle_sim camera;
+            camera.x = campos.x;
+            camera.y = campos.y;
+            camera.z = campos.z;
+            sMaker.tree.depth_sort_leaves(camera,composite_order);           
+        }
+        else
+        {
+          pData = &particle_data[0];
+        }
+#else
+        // Use correct vector dependant on boost usage
+        std::vector<particle_sim>* pData;
+        if (boost) pData = &r_points;
+        else       pData = &particle_data;
+#endif
+       context.npart_all = context.npart;
+       mpiMgr.allreduce (context.npart_all,MPI_Manager::Sum);
 
 #if (defined(CUDA) || defined(OPENCL))
       // CUDA or OPENCL rendering
@@ -275,84 +269,71 @@ int main (int argc, const char **argv)
 #ifdef CUDA
         if (!a_eq_e) planck_fail("CUDA only supported for A==E so far");
         tstack_push("CUDA");
-        cuda_rendering(mydevID, nTasksDev, pic, *pData, campos, centerpos, lookat, sky, amap, b_brightness, params);
+        cuda_rendering(context.mydevID, context.nTasksDev, context.pic, *pData, context.campos, context.centerpos, context.lookat, context.sky, context.amap, context.b_brightness, params, context.cv);
         tstack_pop("CUDA");
 #endif
 #ifdef OPENCL
         tstack_push("OPENCL");
-        opencl_rendering(mydevID, *pData, nDevProc, pic);
+        opencl_rendering(mydevID, *pData, nDevProc, context.pic);
         tstack_pop("OPENCL");
 #endif
       }
       else
-      {
-          host_rendering(params, *pData, pic, campos, centerpos, lookat, sky, amap, b_brightness, npart_all);
+      { 
+        host_rendering(params, *pData, context);
       }
 
 #elif (defined(MIC))
       // Intel MIC rendering
       tstack_push("MIC");
-      mic_rendering(params, *pData, pic, campos, centerpos, lookat, sky, amap, b_brightness,soa_particles, sMaker.is_final_scene());
+      mic_rendering(params, *pData, context.pic, context.campos, context.centerpos, context.lookat, context.sky, context.amap, context.b_brightness,soa_particles, sMaker.is_final_scene());
       tstack_pop("MIC");
 #else
       // Default host rendering
-      host_rendering(params, *pData, pic, campos, centerpos, lookat, sky, amap, b_brightness, npart_all);
+      host_rendering(params, *pData, context);
+
 #endif
     }
 
     tstack_push("Post-processing");
-    mpiMgr.allreduceRaw
-      (reinterpret_cast<float *>(&pic[0][0]),3*xres*yres,MPI_Manager::Sum);
-
-    exptable<float32> xexp(-20.0);
-    if (mpiMgr.master() && a_eq_e)
+    // Parallel image composition
+    composite_images(context);
+    
+    // Master does final post processing
+    if(master)
+    {
+      // For a_eq_q apply exponential
+      exptable<float32> xexp(-20.0);
+      if (mpiMgr.master() && a_eq_e)
 #pragma omp parallel for
-      for (int ix=0;ix<xres;ix++)
-        for (int iy=0;iy<yres;iy++)
-          {
-          pic[ix][iy].r=-xexp.expm1(pic[ix][iy].r);
-          pic[ix][iy].g=-xexp.expm1(pic[ix][iy].g);
-          pic[ix][iy].b=-xexp.expm1(pic[ix][iy].b);
+        for (int ix=0;ix<context.xres;ix++)
+          for (int iy=0;iy<context.yres;iy++)
+          { 
+            context.pic[ix][iy].r=-xexp.expm1(context.pic[ix][iy].r);
+            context.pic[ix][iy].g=-xexp.expm1(context.pic[ix][iy].g);
+            context.pic[ix][iy].b=-xexp.expm1(context.pic[ix][iy].b);
           }
 
+      // Gamma/contrast etc
+      colour_adjust(params, context);
+      // Colourbar
+      if (params.find<bool>("colorbar",false))
+        add_colorbar(params,context.pic,context.amap);
+    }
     tstack_replace("Post-processing","Output");
-
-    if (master && params.find<bool>("colorbar",false))
-      {
-      cout << endl << "creating color bar ..." << endl;
-      add_colorbar(params,pic,amap);
-      }
-
-    double gamma=params.find<double>("pic_gamma",1.0);
-    double helligkeit=params.find<double>("pic_brighness",0.0);
-    double kontrast=params.find<double>("pic_contrast",1.0);
-
-    if (master && (gamma != 1.0 || helligkeit != 0.0 || kontrast != 1.0))
-      {
-	cout << endl << "immage enhancement (gamma,brightness,contrast) = ("
-	     << gamma << "," << helligkeit << "," << kontrast << ")" << endl;
-#pragma omp parallel for
-        for (tsize i=0; i<pic.size1(); ++i)
-          for (tsize j=0; j<pic.size2(); ++j)
-	    {
-	      pic[i][j].r = kontrast * pow((double)pic[i][j].r,gamma) + helligkeit;
-              pic[i][j].g = kontrast * pow((double)pic[i][j].g,gamma) + helligkeit;
-              pic[i][j].b = kontrast * pow((double)pic[i][j].b,gamma) + helligkeit;
-	    }
-       }
 
     if(!params.find<bool>("AnalyzeSimulationOnly"))
       {
       if (master)
         {
         cout << endl << "saving file " << outfile << " ..." << endl;
-
-        LS_Image img(pic.size1(),pic.size2());
+        LS_Image img(context.pic.size1(),context.pic.size2());
 
 #pragma omp parallel for
-        for (tsize i=0; i<pic.size1(); ++i)
-          for (tsize j=0; j<pic.size2(); ++j)
-            img.put_pixel(i,j,Colour(pic[i][j].r,pic[i][j].g,pic[i][j].b));
+        for (tsize i=0; i<context.pic.size1(); ++i)
+          for (tsize j=0; j<context.pic.size2(); ++j)
+            img.put_pixel(i,j,Colour(context.pic[i][j].r,context.pic[i][j].g,context.pic[i][j].b));
+
         int pictype = params.find<int>("pictype",0);
         switch(pictype)
           {
@@ -377,19 +358,17 @@ int main (int argc, const char **argv)
 
     tstack_pop("Output");
 
-
   // Also meant to happen when using CUDA - unimplemented.
-  #if (defined(OPENCL))
-    cuda_timeReport();
-  #endif
-    timeReport();
+#if (defined(OPENCL))
+        cuda_timeReport();
+#endif
+       timeReport(); 
 
     mpiMgr.barrier();
     // Abandon ship if a file named "stop" is found in the working directory.
     // ==>  Allows to stop rendering conveniently using a simple "touch stop".
     planck_assert (!file_present("stop"),"stop file found");
     }
-
 #ifdef VS
   //Just to hold the screen to read the messages when debugging
   cout << endl << "Press any key to end..." ;

@@ -6,18 +6,18 @@
 #OPT += -DNO_I_NORM
 
 #--------------------------------------- Switch on DataSize
-OPT += -DLONGIDS
+#OPT += -DLONGIDS
 
 #--------------------------------------- Switch on HDF5
-#OPT += -DHDF5
+OPT += -DHDF5
 #OPT += -DH5_USE_16_API
 
 #---------------------------------------- Enable FITSIO
 #OPT += -DFITS
 
 #--------------------------------------- Switch on MPI
-OPT += -DUSE_MPI
-#OPT += -DUSE_MPIIO
+#OPT += -DUSE_MPI
+##OPT += -DUSE_MPIIO
 
 #--------------------------------------- CUDA options
 #OPT += -DCUDA
@@ -39,14 +39,30 @@ OPT += -DUSE_MPI
 #--------------------------------------- Visual Studio Option
 #OPT += -DVS
 
+#--------------------------------------- MPI support for A!=E
+#OPT += -DMPI_A_NEQ_E
+
+#--------------------------------------- Independent absorption 
+#OPT += -DINDEPENDENT_A
+
+#--------------------------------------- Client server model
+OPT += -DCLIENT_SERVER
+# Uncomment this to request a username on load
+#OPT += -DSERVER_USERNAME_REQUEST
+
+# Use websocket based communication protocol
+# If commented, default to ZMQ based communication
+OPT += -DUSE_WEBSOCKETS
+
 #--------------------------------------- Select target Computer
-SYSTYPE="generic"
-#SYSTYPE="mac"
+#SYSTYPE="generic"
+SYSTYPE="mac"
 #SYSTYPE="Linux-cluster"
 #SYSTYPE="DAINT"
 #SYSTYPE="GSTAR"
 #SYSTYPE="SuperMuc"
-
+#SYSTYPE="XC30-CCE"
+#SYSTYPE="tiger"
 ### visualization cluster at the Garching computing center (RZG):
 #SYSTYPE="RZG-SLES11-VIZ"
 ### generic SLES11 Linux machines at the Garching computing center (RZG):
@@ -55,7 +71,7 @@ SYSTYPE="generic"
 ### Generic MIC cluster in native and offload modes 
 #SYSTYPE="MIC-native"
 #SYSTYPE="MIC-offload"
-
+#SYSTYPE="MIC-loon"
 
 # Set compiler executables to commonly used names, may be altered below!
 ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
@@ -65,12 +81,15 @@ else
 endif
 
 # OpenMP compiler switch
-OMP      = -fopenmp
+#OMP      = -fopenmp
 
 SUP_INCL = -I. -Icxxsupport -Ic_utils -Ivectorclass
 
 # optimization and warning flags (g++)
-OPTIMIZE =  -pedantic -Wno-long-long -Wfatal-errors -Wextra -Wall -Wstrict-aliasing=2 -Wundef -Wshadow -Wwrite-strings -Wredundant-decls -Woverloaded-virtual -Wcast-qual -Wcast-align -Wpointer-arith -std=c++11 -march=native -std=c++11
+OPTIMIZE = -Ofast -std=c++11 -pedantic -Wno-long-long -Wfatal-errors -Wextra -Wall -Wstrict-aliasing=2 -Wundef -Wshadow -Wwrite-strings -Wredundant-decls -Woverloaded-virtual -Wcast-qual -Wcast-align -Wpointer-arith -march=native 
+
+# -O0 -g -std=c++11
+#-pedantic -Wno-long-long -Wfatal-errors -Wextra -Wall -Wstrict-aliasing=2 -Wundef -Wshadow -Wwrite-strings -Wredundant-decls -Woverloaded-virtual -Wcast-qual -Wcast-align -Wpointer-arith  -march=native 
 #-Wno-newline-eof -g
 #-Wold-style-cast -std=c++11
 
@@ -82,7 +101,7 @@ endif
 
 ifeq ($(SYSTYPE),"generic")
   # OPTIMIZE += -O2 -g -D TWOGALAXIES
-  OPTIMIZE += -O2 -g
+  OPTIMIZE += -O0 -g
 
   # Generic 64bit cuda setup
   ifeq (CUDA,$(findstring CUDA,$(OPT)))
@@ -104,31 +123,65 @@ ifeq ($(SYSTYPE),"mac")
   OPT += -DSPLOTCHMAC
   ifeq (CUDA,$(findstring CUDA,$(OPT)))
 	#CC = CC
-	NVCC = nvcc
-	NVCCARCH = -arch=sm_30
-	CUDA_HOME = /Developer/NVIDIA/CUDA-7.0/
-	OPTIMIZE = -Wall -stdlib=libstdc++ -Wno-unused-function -Wno-unused-variable -Wno-unused-const-variable
-	LIB_OPT  += -L$(CUDA_HOME)/lib -lcudart
-	NVCCFLAGS = -g -ccbin /usr/bin/clang -dc -$(NVCCARCH)
-	SUP_INCL += -I$(CUDA_HOME)/include
+	NVCC       = nvcc
+	NVCCARCH   = -arch=sm_30
+	CUDA_HOME  = /Developer/NVIDIA/CUDA-7.0/
+	OPTIMIZE   = -Wall -stdlib=libstdc++ -Wno-unused-function -Wno-unused-variable -Wno-unused-const-variable
+	LIB_OPT   += -L$(CUDA_HOME)/lib -lcudart
+	NVCCFLAGS  = -g -ccbin /usr/bin/clang -dc -$(NVCCARCH)
+	SUP_INCL  += -I$(CUDA_HOME)/include
 	ifeq (-fopenmp,$(OMP))
 		# Modify ccbin argument to point to your OpenMP enabled clang build (note clang++, this is important)
-		NVCCFLAGS = -g -ccbin /path/to/openmp/supported/c++/compiler -dc -$(NVCCARCH)
+		NVCCFLAGS = -g -ccbin /Users/tims/Programs/clang+llvm-3.9.0-x86_64-apple-darwin/bin/clang++ -dc -$(NVCCARCH)
 	endif
   endif
   ifeq (-fopenmp,$(OMP))
 	# Change this as above
-	CC = /path/to/openmp/supporting/clang
-	OPTIMIZE = -Wall -stdlib=libstdc++ -Wno-unused-function -Wno-unused-variable -Wno-unused-const-variable
-	# These should point to your include and library folders for an openmp runtime library
-	SUP_INCL += -I/path/to/openmp/runtime/include/
-	LIB_OPT += -L/path/to/openmp/runtime/lib/
+	CLANG_PATH = /Users/tims/Programs/clang+llvm-3.9.0-x86_64-apple-darwin/bin/
+	OMP_RUNTIME_PATH = /Users/tims/Programs/Intel-OMP-RT/libomp_oss/exports/mac_32e/lib.thin/
+	CC = $(CLANG_PATH)/clang++
+	OPTIMIZE = -O3 -Wall -std=c++11 -D__apple_build_version__ 
+	OMP = -fopenmp=libiomp5
+	LIB_OPT += -L$(OMP_RUNTIME_PATH)
   endif
   ifeq (PREVIEWER,$(findstring PREVIEWER,$(OPT)))
 	SUP_INCL += -I/opt/X11/include
   endif
   ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
     	CC = mpic++
+  endif
+  ifeq (HDF5,$(findstring HDF5,$(OPT)))
+    HDF5_HOME = /opt/local
+    LIB_HDF5  = -L$(HDF5_HOME)/lib -Wl,-rpath,$(HDF5_HOME)/lib -lhdf5 -lz
+    HDF5_INCL = -I$(HDF5_HOME)/include
+  endif
+  ifeq (CLIENT_SERVER,$(findstring CLIENT_SERVER,$(OPT)))
+    ifeq (USE_WEBSOCKETS, $(findstring USE_WEBSOCKETS,$(OPT)))
+      # Websockets + c++ wrapper library definitions
+      LWS_PATH = dep/libwebsockets
+      WSP_PATH = dep/WSRTI/websocketplus
+      LIB_OPT +=  -L$(LWS_PATH)/lib -lwebsockets
+      SUP_INCL += -I$(WSP_PATH)/include -I$(LWS_PATH)/include
+    else
+      # ZeroMQ definitions (DEPRECATED)
+#      ZMQ_PATH = /home/users/tdykes/zmq
+#      ZRF_PATH = /Users/tims/Work/Cray/zrf
+#      LIB_OPT += -L$(ZMQ_PATH)/lib -lzmq 
+#      SUP_INCL += -I$(ZMQ_PATH)/include -I$(ZRF_PATH)/src/include  -I$(ZRF_PATH)/dep/syncqueue
+    endif
+    SYNCQUEUE_PATH = dep/WSRTI/syncqueue
+    TJPP_PATH = dep/WSRTI/tjpp
+    SRZ_PATH = dep/WSRTI/serializer
+    LIBTURBOJPEG_PATH = ./dep/libjpeg-turbo
+    RAPIDJSON_PATH 		= dep
+
+    LIB_OPT += -L $(LIBTURBOJPEG_PATH)/install/lib -lturbojpeg
+    SUP_INCL += -I$(TJPP_PATH)/include -I$(LIBTURBOJPEG_PATH) -I$(SYNCQUEUE_PATH) -I$(SRZ_PATH)/include \
+    						-I$(RAPIDJSON_PATH) 
+  endif
+  ifeq (FITS,$(findstring FITS,$(OPT)))
+  	LIB_OPT  +=  -L/Users/tims/Code/cfitsio/lib
+  	SUP_INCL += -I/Users/tims/Code/cfitsio/include
   endif
 endif
 
@@ -156,9 +209,87 @@ ifeq ($(SYSTYPE),"Linux-cluster")
 endif
 
 # Configuration for PIZ DAINT at CSCS
+# Can be used for generic XC30 with GNU, note -march=broadwell in OPTIMIZE though
 ifeq ($(SYSTYPE), "DAINT")
+  CC = CC
+  OPTIMIZE = -Ofast  -std=c++11 -pedantic -Wno-long-long -Wfatal-errors -Wextra -Wall -Wstrict-aliasing=2 -Wundef -Wshadow -Wwrite-strings -Wredundant-decls -Woverloaded-virtual -Wcast-qual -Wcast-align -Wpointer-arith -march=native
   ifeq (CUDA, $(findstring CUDA, $(OPT)))
-  CUDATOOLKIT_HOME=/opt/nvidia/cudatoolkit/7.028-1.0502.10742.5.1
+    #CUDATOOLKIT_HOME=/opt/nvidia/cudatoolkit/7.028-1.0502.10742.5.1
+    CUDATOOLKIT_HOME=/opt/nvidia/cudatoolkit/default
+    NVCC = nvcc
+    NVCCARCH = -arch=sm_35
+    NVCCFLAGS = -g  $(NVCCARCH) -dc -use_fast_math --std=c++11 -ccbin=CC
+    LIB_OPT  += -L$(CUDATOOLKIT_HOME)/lib64 -lcudart
+    SUP_INCL += -I$(CUDATOOLKIT_HOME)/include
+  endif
+  ifeq (HDF5,$(findstring HDF5,$(OPT)))
+    HDF5_HOME = /opt/cray/hdf5-parallel/1.8.13/gnu/48/
+    LIB_HDF5  = -L$(HDF5_HOME)lib -Wl,-rpath,$(HDF5_HOME)/lib -lhdf5 -lz
+    HDF5_INCL = -I$(HDF5_HOME)include
+  endif
+  ifeq (CLIENT_SERVER,$(findstring CLIENT_SERVER,$(OPT)))
+    ifeq (USE_WEBSOCKETS, $(findstring USE_WEBSOCKETS,$(OPT)))
+      # Websockets + c++ wrapper library definitions
+      LWS_PATH = dep/libwebsockets
+      WSP_PATH = dep/websocketplus
+      LIB_OPT += -dynamic -L$(LWS_PATH)/lib -lwebsockets 
+#-L/Users/tims/Code/libwebsockets/lib -lwebsockets
+      SUP_INCL += -I$(WSP_PATH)/include  -I$(LWS_PATH)/include
+#-I/Users/tims/Code/libwebsockets/lib
+    else
+      # ZeroMQ definitions
+#	ZMQ_PATH = /home/users/tdykes/zmq
+#	ZRF_PATH = /home/users/tdykes/zrf
+#      LIB_OPT += -L$(ZMQ_PATH)/lib -lzmq 
+#      SUP_INCL += -I$(ZMQ_PATH)/include -I$(ZRF_PATH)/src/include  -I$(ZRF_PATH)/dep/syncqueue
+    endif
+    SYNCQUEUE_PATH = dep/syncqueue
+    TJPP_PATH = dep/tjpp
+    LIBTURBOJPEG_PATH = dep/libjpeg-turbo-1.5.0
+    SRZ_PATH = dep/serializer
+    RAPIDJSON_PATH 		= dep
+    LIB_OPT  += -L$(LIBTURBOJPEG_PATH)/.libs -lturbojpeg
+    SUP_INCL += -I$(SYNCQUEUE_PATH) -I$(SRZ_PATH)/include -I$(TJPP_PATH)/include -I$(LIBTURBOJPEG_PATH) -I$(RAPIDJSON_PATH)
+  endif
+endif
+
+# XC40 with GPUs
+ifeq ($(SYSTYPE), "tiger")
+  CC = CC
+  OPTIMIZE = -Ofast  -std=c++11 -pedantic -Wno-long-long -Wfatal-errors -Wextra -Wall -Wstrict-aliasing=2 -Wundef -Wshadow -Wwrite-strings -Wredundant-decls -Woverloaded-virtual -Wcast-qual -Wcast-align -Wpointer-arith -march=native
+  ifeq (CUDA, $(findstring CUDA, $(OPT)))
+    #CUDATOOLKIT_HOME=/opt/nvidia/cudatoolkit/7.028-1.0502.10742.5.1
+    CUDATOOLKIT_HOME=/opt/nvidia/cudatoolkit/default
+    NVCC = nvcc
+    NVCCARCH = -arch=sm_35
+    NVCCFLAGS = -g  $(NVCCARCH) -dc -use_fast_math --std=c++11 -ccbin=CC
+    LIB_OPT  += -L$(CUDATOOLKIT_HOME)/lib64 -lcudart
+    SUP_INCL += -I$(CUDATOOLKIT_HOME)/include
+  endif
+  ifeq (HDF5,$(findstring HDF5,$(OPT)))
+    HDF5_HOME = /opt/cray/hdf5-parallel/1.8.13/gnu/48/
+    LIB_HDF5  = -L$(HDF5_HOME)lib -Wl,-rpath,$(HDF5_HOME)/lib -lhdf5 -lz
+    HDF5_INCL = -I$(HDF5_HOME)include
+  endif
+  ifeq (CLIENT_SERVER,$(findstring CLIENT_SERVER,$(OPT)))
+	ZMQ_PATH = /cray/css/users/tdykes/zmq-gcc-4.9.3
+	ZRF_PATH = /cray/css/users/tdykes/zrf
+	TJPP_PATH = /cray/css/users/tdykes/tjpp
+	LIBTURBOJPEG_PATH = /cray/css/users/tdykes/libjpeg-turbo-1.5.0
+	
+	SUP_INCL += -I$(ZMQ_PATH)/include -I$(TJPP_PATH)/include -I$(LIBTURBOJPEG_PATH)
+	LIB_OPT += -L$(ZMQ_PATH)/lib -lzmq -L$(LIBTURBOJPEG_PATH)/.libs -lturbojpeg
+	SUP_INCL += -I$(ZRF_PATH)/src/include -I$(ZRF_PATH)/dep/syncqueue
+  endif
+endif
+
+# Configuration for an XC30 with cray toolchain
+ifeq ($(SYSTYPE), "XC30-CCE") 
+  CC = CC
+  OMP =
+  OPTIMIZE =-h std=c++11 -hnomessage=12489 
+  ifeq (CUDA, $(findstring CUDA, $(OPT)))
+  CUDATOOLKIT_HOME=/opt/nvidia/cudatoolkit/default
   NVCC = nvcc
   NVCCARCH = -arch=sm_30
   NVCCFLAGS = -g  $(NVCCARCH) -dc -use_fast_math -std=c++11 -ccbin=CC
@@ -169,12 +300,13 @@ ifeq ($(SYSTYPE), "DAINT")
   HDF5_HOME = /opt/cray/hdf5-parallel/1.8.13/gnu/48/
   LIB_HDF5  = -L$(HDF5_HOME)lib -Wl,-rpath,$(HDF5_HOME)/lib -lhdf5 -lz
   HDF5_INCL = -I$(HDF5_HOME)include
-  endif
-  ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
-	CC = CC
+  endif 
+  ifeq (CLIENT_SERVER,$(findstring CLIENT_SERVER,$(OPT)))
+	ZMQ_PATH = /cray/css/users/tdykes/zmq-cray
+	SUP_INCL += -I$(ZMQ_PATH)/include
+	LIB_OPT += -L$(ZMQ_PATH)/lib
   endif
 endif
-
 
 ifeq ($(SYSTYPE),"GSTAR")
   ifeq (USE_MPI, $(findstring USE_MPI, $(OPT)))
@@ -251,9 +383,20 @@ endif
 
 # Configuration for generic mic cluster
 ifeq ($(SYSTYPE),"MIC-native")
-  CC = icpc -mmic -O2
+  CC = CC -xmic-avx512 -Ofast -g
   #-vec-report6
-  OPTIMIZE = -std=c++11 -pedantic -Wfatal-errors -Wextra -Wall -Wstrict-aliasing=2 -Wundef -Wshadow -Wwrite-strings -Woverloaded-virtual -Wcast-qual -Wpointer-arith
+  OPTIMIZE = -std=c++11
+
+	ZMQ_PATH = /cray/css/users/tdykes/zmq-mic
+	ZRF_PATH = /cray/css/users/tdykes/zrf
+	TJPP_PATH = /cray/css/users/tdykes/tjpp
+	LIBTURBOJPEG_PATH = /cray/css/users/tdykes/libjpeg-turbo-1.5.0
+	
+	SUP_INCL += -I$(ZMQ_PATH)/include -I$(TJPP_PATH)/include -I$(LIBTURBOJPEG_PATH)
+	LIB_OPT += -L$(ZMQ_PATH)/lib -lzmq -L$(LIBTURBOJPEG_PATH)/.libs -lturbojpeg
+	SUP_INCL += -I$(ZRF_PATH)/src/include -I$(ZRF_PATH)/dep/syncqueue
+# -Wall
+#-pedantic -Wfatal-errors -Wextra -Wall -Wstrict-aliasing=2 -Wundef -Wshadow -Wwrite-strings -Woverloaded-virtual -Wcast-qual -Wpointer-arith
 endif
 
 ifeq ($(SYSTYPE),"MIC-offload")
@@ -268,6 +411,30 @@ ifeq ($(SYSTYPE),"MIC-offload")
   # -guide -parallel
 endif
 
+ifeq ($(SYSTYPE),"MIC-loon")
+
+  ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
+   CC = mpiicpc
+  else
+   CC = icpc
+  endif
+  #-vec-report6
+  OPTIMIZE = -xmic-avx512 -O2 -g -std=c++11
+
+	ZMQ_PATH = /cray/css/users/tdykes/zmq-mic
+	ZRF_PATH = /cray/css/users/tdykes/zrf
+	TJPP_PATH = /cray/css/users/tdykes/tjpp
+	LIBTURBOJPEG_PATH = /cray/css/users/tdykes/libjpeg-turbo-1.5.0
+	
+	SUP_INCL += -I$(ZMQ_PATH)/include -I$(TJPP_PATH)/include -I$(LIBTURBOJPEG_PATH)
+	LIB_OPT += -L$(ZMQ_PATH)/lib -lzmq -L$(LIBTURBOJPEG_PATH)/.libs -lturbojpeg
+	SUP_INCL += -I$(ZRF_PATH)/src/include -I$(ZRF_PATH)/dep/syncqueue
+endif
+
+# Override all optimization settings for debug build
+ifeq ($(DEBUG), 1)
+OPTIMIZE = -g -O0 -std=c++11
+endif
 
 #--------------------------------------- Here we go
 
@@ -302,6 +469,9 @@ ifeq (HDF5,$(findstring HDF5,$(OPT)))
 endif
 
 ifeq (FITS,$(findstring FITS,$(OPT)))
+  FITSIO_PATH = /Users/tims/Code/cfitsio
+  SUP_INCL += -I$(FITSIO_PATH)/include
+  LIB_OPT += -L$(FITSIO_PATH)/lib
   OBJS += reader/fits_reader.o
   LIB_FITSIO = -lcfitsio
 endif
@@ -319,9 +489,21 @@ endif
 # Intel MIC config
 ifeq (MIC,$(findstring MIC,$(OPT)))
   OBJS += mic/mic_splotch.o mic/mic_compute_params.o mic/mic_kernel.o mic/mic_allocator.o
-  OPTIONS += -offload-option,mic,compiler," -fopenmp -Wall -O3 -L. -z defs"
+#  OPTIONS += -qoffload-option,mic,compiler," -fopenmp -Wall -O3 -L. -z defs"
 endif
 
+# Debug object for utils, should be removed in favour of planck objects soon..
+ifeq (MPI_A_NEQ_E, $(findstring MPI_A_NEQ_E,$(OPT)))
+OBJS += utils/debug.o utils/composite.o
+endif
+
+# 
+ifeq (CLIENT_SERVER, $(findstring CLIENT_SERVER,$(OPT)))
+OBJS += server/server.o server/controller.o server/data.o
+ifneq (PREVIEWER, $(findstring PREVIEWER,$(OPT)))
+OBJS += previewer/libs/core/Camera.o previewer/libs/core/MathLib.o previewer/libs/events/actions/CameraAction.o
+endif
+endif
 
 ##################################################
 #        SPLOTCH PREVIEWER SECTION
@@ -343,12 +525,17 @@ endif
 #
 # Uncomment below to use Programmable Pipeline rendering using Vertex Buffer Objects and shaders + geometry shader + FBOs
 #----------------------------------
-RENDER_METHOD = -DRENDER_PP_FBO
+#RENDER_METHOD = -DRENDER_PP_FBO
 #----------------------------------
 #
 # Uncomment below to use Programmable Pipeline rendering using Vertex Buffer Objects and shaders + geometry shader + FBOs + post processing filtering effects
 #----------------------------------
 #RENDER_METHOD = -DRENDER_PP_FBOF
+#----------------------------------
+#
+# Uncomment below to use the previewer as a remote viewer tool for Splotch (Only valid with CLIENT_SERVER on)
+#----------------------------------
+RENDER_METHOD = -DREMOTE_VIEWER
 #----------------------------------
 #
 # Uncomment for previewer DEBUG mode
@@ -390,6 +577,14 @@ ifeq ($(RENDER_METHOD),-DRENDER_PP_FBOF)
             previewer/libs/core/Fbo.o
 endif
 
+ifeq ($(RENDER_METHOD),-DREMOTE_VIEWER)
+
+ifeq (USE_WEBSOCKETS, $(findstring USE_WEBSOCKETS,$(OPT)))
+$(error Options mismatch; If PREVIEWER enabled and REMOTE_VIEWER chosen as render method (to use with Splotch Server), \
+  the server must use ZMQ communication protocol not websockets, i.e.  USE_WEBSOCKETS must be disabled (commented in options))
+endif
+	OBJS_BUILD_SPECIFIC = previewer/libs/renderers/RemoteViewer.o 
+endif
 
 OBJS +=   previewer/Previewer.o previewer/libs/core/Parameter.o previewer/libs/core/ParticleSimulation.o \
           previewer/libs/core/WindowManager.o previewer/libs/core/Camera.o previewer/libs/core/ParticleData.o \

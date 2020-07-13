@@ -29,7 +29,9 @@
 #include "cuda/cuda_utils.h"
 #include "cuda/cuda_render.h"
 
-void cuda_rendering(int mydevID, int nTasksDev, arr2<COLOUR> &pic, std::vector<particle_sim> &particle, const vec3 &campos, const vec3 &centerpos, const vec3 &lookat, vec3 &sky, std::vector<COLOURMAP> &amap, float b_brightness, paramfile &g_params);
+void cuda_rendercontext_init(paramfile& params, render_context& context);
+void cuda_renderer_init(int& mydevID, int nTasksDev, arr2<COLOUR> &pic, vector<particle_sim> &particle, vector<COLOURMAP> &amap, paramfile &g_params, cu_cpu_vars& cv);
+void cuda_rendering(int mydevID, int nTasksDev, arr2<COLOUR> &pic, std::vector<particle_sim> &particle, const vec3 &campos, const vec3 &centerpos, const vec3 &lookat, vec3 &sky, std::vector<COLOURMAP> &amap, float b_brightness, paramfile &g_params, cu_cpu_vars& cv);
 void setup_colormap(int ptypes, std::vector<COLOURMAP> &amap, cu_gpu_vars* gv);
 
 // NVIDIA device query functions defined in cuda_device_query.cu

@@ -28,7 +28,7 @@ namespace previewer
 		// Window lifecycle members
 		void GUIWindow::Create()
 		{
-			Create(800, 800);
+			Create(1440, 800);
 		}
 		void GUIWindow::Create(int _width, int _height)
 		{
@@ -161,10 +161,15 @@ namespace previewer
 					{
 						width = xce.width;
 						height = xce.height;
-
+// #ifdef CLIENT_SERVER
+// 						event.id = evResize;
+// 						event.field0 = width;
+// 						event.field1 = height;						
+// #else
 						event.eventType = evResize;
 						event.mouseX = width;
 						event.mouseY = height;
+//#endif
 					}
 				}
 				break;
@@ -181,9 +186,11 @@ namespace previewer
 		// event to be propogated
 		void GUIWindow::HandleExposeEvent(Event& event)
 		{
-			// Set event type to exposed
+// #ifdef CLIENT_SERVER
+// 			event.id = evExposed;
+// #else
 			event.eventType = evExposed;
-
+//#endif
 			return;
 		}
 
@@ -191,16 +198,7 @@ namespace previewer
 		// event to be propogated
 		void GUIWindow::HandleKeyPressEvent(Event& event)
 		{
-			// Set event type to key press
-			event.eventType = evKeyPress;
-
-			// Mouse element is not used
-			event.mouseX = 0;
-			event.mouseY = 0;
-
-			// Find which key was pressed
-			std::string keyPressed = FindKey();
-
+			std::string keyPressed = FindKey();		
 			// Test to see if the key has been pressed
 			if(keyPressed == "")
 			{
@@ -208,9 +206,19 @@ namespace previewer
 				return;
 			}
 
-			// Setup the event
+// #ifdef CLIENT_SERVER
+// 			event.id = evKeyPress;
+// 			event.field0 = 0;
+// 			event.field1 = 0;
+// 			keyPressed.copy(event.desc,keyPressed.length());
+// 			event.desc[keyPressed.length()] = '\0';
+// #else
+			// Set event type to key press
+			event.eventType = evKeyPress;
+			event.mouseX = 0;
+			event.mouseY = 0;
 			event.keyID = keyPressed;
-
+//#endif
 			return;
 		}
 
@@ -218,13 +226,6 @@ namespace previewer
 		// event to be propogated
 		void GUIWindow::HandleKeyReleaseEvent(Event& event)
 		{
-			// Set event type to key release
-			event.eventType = evKeyRelease;
-
-			// Mouse element is not used
-			event.mouseX = 0;
-			event.mouseY = 0;
-
 			// Find which key was released
 			std::string keyReleased = FindKey();
 
@@ -235,9 +236,21 @@ namespace previewer
 				return;
 			}
 
+// #ifdef CLIENT_SERVER
+// 			event.id = evKeyRelease;
+// 			event.field0 = 0;
+// 			event.field1 = 0;
+// 			keyReleased.copy(event.desc,keyReleased.length());
+// 			event.desc[keyReleased.length()] = '\0';
+// #else
+			// Set event type to key release
+			event.eventType = evKeyRelease;
+			// Mouse element is not used
+			event.mouseX = 0;
+			event.mouseY = 0;
 			// Setup the event
 			event.keyID = keyReleased;
-
+//#endif
 			return;
 		}
 
@@ -245,6 +258,15 @@ namespace previewer
 		// event to be propogated
 		void GUIWindow::HandleButtonPressEvent(Event& event)
 		{
+
+// #ifdef CLIENT_SERVER
+// 			event.id = evButtonPress;
+// 			// Store the button pressed as a string 
+// 			snprintf(event.desc, DESC_LEN, "%u", xEvent.xbutton.button);
+// 			printf("event.desc: %s\n", event.desc);
+// 			event.field0 = xEvent.xbutton.x;
+// 			event.field1 = xEvent.xbutton.y;
+// #else
 			// Set the event type to button press
 			event.eventType = evButtonPress;
 
@@ -260,7 +282,7 @@ namespace previewer
 			// Store translated cursor at button click
 			event.translatedMouseX = xEvent.xbutton.x;
 			event.translatedMouseY = height - xEvent.xbutton.y; // (swap axis)
-
+//#endif
 			return;
 		}
 
@@ -268,6 +290,13 @@ namespace previewer
 		// event to be propogated
 		void GUIWindow::HandleButtonReleaseEvent(Event& event)
 		{
+// #ifdef CLIENT_SERVER
+// 			event.id = evButtonRelease;
+// 			// Store the button pressed as a string 
+// 			snprintf(event.desc, DESC_LEN, "%u", xEvent.xbutton.button);
+// 			event.field0 = xEvent.xbutton.x;
+// 			event.field1 = xEvent.xbutton.y;
+// #else
 			// Set the event type to button release
 			event.eventType = evButtonRelease;
 
@@ -279,7 +308,7 @@ namespace previewer
 			// Store cursor location at button click
 			event.mouseX = xEvent.xbutton.x;
 			event.mouseY = xEvent.xbutton.y;
-
+//#endif
 			return;
 		}
 
@@ -287,6 +316,12 @@ namespace previewer
 		// event to be propogated (when holding down mouse 1 and moving)
 		void GUIWindow::HandleMotionNotifyEvent(Event& event)
 		{
+// #ifdef CLIENT_SERVER
+// 			event.id = evMouseMotion;
+// 			event.desc[0]='\0';
+// 			event.field0 = xEvent.xbutton.x;
+// 			event.field1 = xEvent.xbutton.y;
+// #else
 			// Set the event type and keyID to mouse motion
 			event.eventType = evMouseMotion;
 			event.keyID = "Motion";
@@ -298,7 +333,7 @@ namespace previewer
 			// Store translated cursor at button click
 			event.translatedMouseX = xEvent.xbutton.x;
 			event.translatedMouseY = height - xEvent.xbutton.y;
-
+//#endif
 			return;
 		}
 
@@ -311,9 +346,13 @@ namespace previewer
 			{
 				DebugPrint("Received window quit message\n");
 				// Set all the event information
+// #ifdef CLIENT_SERVER
+// 				event.id = evQuitApplication;
+// 				event.desc[0]='\0';
+// #else
 				event.eventType = evQuitApplication;
 				event.keyID = "";
-
+//#endif
 				return;
 			}
 		}
@@ -322,12 +361,18 @@ namespace previewer
 		// with type IgnoreEvent
 		void GUIWindow::HandleIgnoreEvent(Event& event)
 		{
+// #ifdef CLIENT_SERVER
+// 			event.id = evIgnoreEvent;
+// 			event.desc[0]='\0';
+// 			event.field0 = 0;
+// 			event.field1 = 0;			
+// #else
 			// Set all the event information
 			event.eventType = evIgnoreEvent;
 			event.keyID = "";
 			event.mouseX = 0;
 			event.mouseY = 0;
-
+//#endif
 			return;
 		}
 
@@ -362,8 +407,6 @@ namespace previewer
 				keyPressed = "ESCAPE";
 			else if(IsKeyID(XK_Delete))
 				keyPressed = "DELETE";
-			else if(IsKeyID(XK_space))
-				keyPressed = "SPACE";
 			else if(IsKeyID(XK_Shift_L) || IsKeyID(XK_Shift_R))
 				keyPressed = "SHIFT";
 			else if(IsKeyID(XK_Control_L) || IsKeyID(XK_Control_R))

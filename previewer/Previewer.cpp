@@ -115,151 +115,74 @@ namespace previewer
 		return;
 	}
 
-	void Previewer::OnQuitApplication(Event)
+	void Previewer::OnQuitApplication(Event ev)
 	{
 		DebugPrint("Terminating Application\n");
 
 		isApplicationTerminating = true;
 	}
 
-	void Previewer::TriggerOnButtonPressEvent(std::string buttonPressed, float xPosition, float yPosition)
+	void Previewer::TriggerOnButtonPressEvent(Event& ev)
 	{
-		// Trigger On Button Press Event
-		Event event;
 
-		// Set the event type to button press
-		event.eventType = evButtonPress;
-
-		// Store the button pressed as a string
-		event.keyID = buttonPressed;
-
-		// Store cursor location at button click
-		event.mouseX = xPosition;
-		event.mouseY = yPosition;
-
-		// Store translated cursor at button click
-		event.translatedMouseX = xPosition;
-		event.translatedMouseY = screenSize.y - yPosition; // (swap axis)
-
+#ifndef CLIENT_SERVER
+		ev.translatedMouseX = xPosition;
+		ev.translatedMouseY = screenSize.y - yPosition; // (swap axis)
+#endif
 		// Call the event handler
-		OnButtonPressEvent::CallEvent(event);
+		OnButtonPressEvent::CallEvent(ev);
 
 		return;
 	}
 
-	void Previewer::TriggerOnButtonReleaseEvent(std::string buttonReleased, float xPosition, float yPosition)
+	void Previewer::TriggerOnButtonReleaseEvent(Event& ev)
 	{
-		// Trigger on Button Release Event
-		Event event;
-
-		// Set the event type to button release
-		event.eventType = evButtonRelease;
-
-		// Store the button released as a string
-		event.keyID = buttonReleased;
-
-		// Store cursor location at button click
-		event.mouseX = xPosition;
-		event.mouseY = yPosition;
-
-		// Store translated cursor at button click
-		event.translatedMouseX = xPosition;
-		event.translatedMouseY = screenSize.y - yPosition; // (swap axis)
-
+#ifndef CLIENT_SERVER
+		ev.translatedMouseX = xPosition;
+		ev.translatedMouseY = screenSize.y - yPosition; // (swap axis)
+#endif
 		// Call the event handler
-		OnButtonReleaseEvent::CallEvent(event);
+		OnButtonReleaseEvent::CallEvent(ev);
 
 		return;
 	}
 
-	void Previewer::TriggerOnExposedEvent()
+	void Previewer::TriggerOnExposedEvent(Event& ev)
 	{
-		// Trigger on Exposed Event
-		Event event;
-
-		// Set event type to exposed
-		event.eventType = evExposed;
-
 		// Call the event handler
-		OnExposedEvent::CallEvent(event);
+		OnExposedEvent::CallEvent(ev);
+		return;
+	}
+
+	void Previewer::TriggerOnKeyPressEvent(Event& ev)
+	{
+		// Call the event handler
+		OnKeyPressEvent::CallEvent(ev);
 
 		return;
 	}
 
-	void Previewer::TriggerOnKeyPressEvent(std::string keyPressed)
+	void Previewer::TriggerOnKeyReleaseEvent(Event& ev)
 	{
-		// Trigger on Key Press Event
-		Event event;
-
-		// Set event type to key press
-		event.eventType = evKeyPress;
-
-		// Mouse element is not used
-		event.mouseX = 0;
-		event.mouseY = 0;
-
-		// Setup the event
-		event.keyID = keyPressed;
-
 		// Call the event handler
-		OnKeyPressEvent::CallEvent(event);
-
+		OnKeyReleaseEvent::CallEvent(ev);
 		return;
 	}
 
-	void Previewer::TriggerOnKeyReleaseEvent(std::string keyReleased)
+	void Previewer::TriggerOnMotionEvent(Event& ev)
 	{
-		// Trigger on Key Release Event
-		Event event;
-
-		// Set event type to key release
-		event.eventType = evKeyRelease;
-
-		// Mouse element is not used
-		event.mouseX = 0;
-		event.mouseY = 0;
-
-		// Setup the event
-		event.keyID = keyReleased;
-
-		// Call the event handler
-		OnKeyReleaseEvent::CallEvent(event);
-
+#ifndef CLIENT_SERVER
+		ev.translatedMouseX = xPosition;
+		ev.translatedMouseY = screenSize.y - yPosition; // (swap axis);
+#endif
+		OnMotionEvent::CallEvent(ev);
 		return;
 	}
 
-	void Previewer::TriggerOnMotionEvent(float xPosition, float yPosition)
+	void Previewer::TriggerOnQuitApplicationEvent(Event& ev)
 	{
-		// Trigger on Motion Event
-		Event event;
-
-		// Set the event type and keyID to mouse motion
-		event.eventType = evMouseMotion;
-		event.keyID = "Motion";
-
-		// Store the new cursor position
-		event.mouseX = xPosition;
-		event.mouseY = yPosition;
-		
-		// Store translated cursor at button click
-		event.translatedMouseX = xPosition;
-		event.translatedMouseY = screenSize.y - yPosition; // (swap axis);
-
-		OnMotionEvent::CallEvent(event);
-
-		return;
-	}
-
-	void Previewer::TriggerOnQuitApplicationEvent()
-	{
-		// Trigger on Quit Application Event
-		Event event;
-
-		// Set the event type to quit the application
-		event.eventType = evQuitApplication;
-
 		// Call the event handler
-		OnQuitApplicationEvent::CallEvent(event);
+		OnQuitApplicationEvent::CallEvent(ev);
 
 		return;
 	}
@@ -507,6 +430,11 @@ namespace previewer
 	void Previewer::SetTargetCenter()
 	{
 		particleSim.SetTargetCenter();
+	}
+
+	void Previewer::PrintCamera()
+	{
+		particleSim.PrintCamera();
 	}
 
 }

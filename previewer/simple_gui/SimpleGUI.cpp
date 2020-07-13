@@ -33,21 +33,22 @@ namespace previewer
 			// Set terminating flag
 			isApplicationTerminating = false;
 
-			// Create a window
-			window.Create();
-
 			// If file exists load application
 			if(FileLib::FileExists(const_cast<char*>(paramFile.c_str())))
 			{
 				application.Load(paramFile);
 			}
+			// Create a window
+			int x = application.GetParameterT<int>("xres", 800);
+			int y = application.GetParameterT<int>("yres", 800);
+			window.Create( x, y);
 
 			// Once we've loaded the application, check paramfile for a font
 			std::string font = application.GetParameter("xfont", "-misc-fixed-medium-r-semicondensed--0-0-75-75-c-0-iso8859-1");
 			window.LoadFont(font);
 
 			// Set render size and position
-			application.SetRenderSize(800, 800);
+			application.SetRenderSize(x, y);
 			application.SetRenderPosition(0,0);
 
 			Run();
@@ -66,45 +67,52 @@ namespace previewer
 				while(window.IsEventPending())
 				{
 					Event ev = window.GetNextEvent();
-
+// #ifdef CLIENT_SERVER
+// 					switch(ev.id)
+// #else
 					switch(ev.eventType)
+//#endif
 					{
 						case evExposed:
-							application.TriggerOnExposedEvent();
+							application.TriggerOnExposedEvent(ev);
 						break;
 
 						case evKeyPress:
 							// Dont allow application keypress events when gui is active
 							if(!guiActive) 
-								application.TriggerOnKeyPressEvent(ev.keyID);
+								application.TriggerOnKeyPressEvent(ev);
 							command.HandleKeyEvent(ev, application);
 						break;
 
 						case evKeyRelease:
 							// Dont allow application keyrelease events when gui is active
 							if(!guiActive) 
-								application.TriggerOnKeyReleaseEvent(ev.keyID);
+								application.TriggerOnKeyReleaseEvent(ev);
 						break;
 
 						case evButtonPress:
-							application.TriggerOnButtonPressEvent(ev.keyID, ev.mouseX, ev.mouseY);
+							application.TriggerOnButtonPressEvent(ev);
 						break;
 
 						case evButtonRelease:
-							application.TriggerOnButtonReleaseEvent(ev.keyID, ev.mouseX, ev.mouseY);
+							application.TriggerOnButtonReleaseEvent(ev);
 						break;
 
 						case evMouseMotion:
-							application.TriggerOnMotionEvent(ev.mouseX, ev.mouseY);
+							application.TriggerOnMotionEvent(ev);
 						break;
 
 						case evQuitApplication:
-							application.TriggerOnQuitApplicationEvent();
+							application.TriggerOnQuitApplicationEvent(ev);
 							isApplicationTerminating = true;
 						break;
 
 						case evResize:
+// #ifdef CLIENT_SERVER
+// 							application.SetRenderSize(ev.field0, ev.field1);
+// #else
 							application.SetRenderSize(ev.mouseX, ev.mouseY);
+//#endif
 						break;
 
 						default:
