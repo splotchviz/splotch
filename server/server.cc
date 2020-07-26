@@ -166,15 +166,7 @@ void SplotchServer::run(sceneMaker& sMaker, std::vector<particle_sim> &particle_
         else
         { 
   #endif
-
-  #ifdef MIC
-        // Intel MIC rendering
-        tstack_push("MIC");
-        mic_rendering(*params, particle_data, rc.pic, rc.campos, rc.centerpos, rc.lookat, rc.sky, rc.amap, rc.b_brightness,soa_particles, sMaker.is_final_scene());
-        tstack_pop("MIC");
-  #else
       host_rendering(*params, particle_data, rc);
-  #endif
   #ifdef CUDA
         }
   #endif

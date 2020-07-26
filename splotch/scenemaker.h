@@ -93,11 +93,7 @@ class sceneMaker
   Box<float,3> treeBoundingBox(render_context& context);
   void treeUpdateOpacityRes(arr2<COLOUR>& pic, arr2<COLOUR>& opac);
 #endif
-
-#ifdef MIC
-    // Allow mic to know if it should free data
-    bool is_final_scene();
-#endif
+  bool is_final_scene();
   };
 
 #endif

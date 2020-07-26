@@ -41,10 +41,6 @@
 #include "opencl/splotch_cuda2.h"
 #endif
 
-#ifdef MIC
-#include "mic/mic_splotch.h"
-#endif
-
 #ifdef PREVIEWER
 #include "previewer/simple_gui/SimpleGUI.h"
 #include "previewer/libs/core/FileLib.h"
@@ -132,16 +128,6 @@ int main (int argc, const char **argv)
   vector<particle_sim> r_points;
   // Create our rendering context
   render_context context;
-
-// Knights Corner MIC Initialization
-#ifdef MIC
-  tstack_push("Init mic");
-  mic_init_offload();
-    // Struct to hold reformatted particle data
-  // Only used for Intel Xeon Phi offload model
-  mic_soa_particles soa_particles;
-  tstack_pop("Init mic");
-#endif
 
 // CUDA Initialization
 #ifdef CUDA
@@ -282,12 +268,6 @@ int main (int argc, const char **argv)
       { 
         host_rendering(params, *pData, context);
       }
-
-#elif (defined(MIC))
-      // Intel MIC rendering
-      tstack_push("MIC");
-      mic_rendering(params, *pData, context.pic, context.campos, context.centerpos, context.lookat, context.sky, context.amap, context.b_brightness,soa_particles, sMaker.is_final_scene());
-      tstack_pop("MIC");
 #else
       // Default host rendering
       host_rendering(params, *pData, context);

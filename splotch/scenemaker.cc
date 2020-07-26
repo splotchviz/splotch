@@ -1408,11 +1408,7 @@ void sceneMaker::unloadData(bool force_dealloc)
 }
 
 #endif
-#ifdef MIC
-  // Check if we are on final scene, if so we must free memory
-  // NOTE: Should reconsider this for client server
-  bool sceneMaker::is_final_scene()
-  {
-    return (cur_scene == scenes.size() - 1) ? true : false;
-  }
-#endif
+bool sceneMaker::is_final_scene()
+{
+  return (cur_scene == scenes.size() - 1) ? true : false;
+}

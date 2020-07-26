@@ -27,9 +27,6 @@
 #OPT += -DOPENCL
 #OPT += -DNO_WIN_THREAD
 
-#--------------------------------------- MIC options
-#OPT += -DMIC
-
 #--------------------------------------- Switch on Previewer
 #OPT += -DPREVIEWER
 
@@ -63,11 +60,6 @@ SYSTYPE="generic"
 #SYSTYPE="RZG-SLES11-VIZ"
 ### generic SLES11 Linux machines at the Garching computing center (RZG):
 #SYSTYPE="RZG-SLES11-generic"
-
-### Generic MIC cluster in native and offload modes 
-#SYSTYPE="MIC-native"
-#SYSTYPE="MIC-offload"
-#SYSTYPE="MIC-loon"
 
 # Set compiler executables to commonly used names, may be altered below!
 ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
@@ -328,27 +320,6 @@ ifeq ($(SYSTYPE),"RZG-SLES11-generic")
   OMP       = -fopenmp
 endif
 
-
-# Configuration for generic mic cluster native/offload
-ifeq ($(SYSTYPE),"MIC-native")
-  CC = CC -xmic-avx512 -Ofast -g
-  #-vec-report6
-  OPTIMIZE = -std=c++11
-endif
-
-ifeq ($(SYSTYPE),"MIC-offload")
-  ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
-   CC = mpiicpc
-  else
-   CC = icpc
-  endif
-  OPTIMIZE = -Wall -O2
-  #-opt-report-phase=offload
-  #-vec-report2
-  # -guide -parallel
-endif
-
-
 #--------------------------------------- Debug override 
 
 # Override all optimization settings for debug build
@@ -404,12 +375,6 @@ else
   OBJS += cuda/cuda_splotch.o cuda/cuda_policy.o cuda/cuda_utils.o cuda/cuda_device_query.o cuda/cuda_kernel.o cuda/cuda_render.o
   CULINK = cuda/cuda_link.o
   endif
-endif
-
-# Intel MIC config
-ifeq (MIC,$(findstring MIC,$(OPT)))
-  OBJS += mic/mic_splotch.o mic/mic_compute_params.o mic/mic_kernel.o mic/mic_allocator.o
-#  OPTIONS += -qoffload-option,mic,compiler," -fopenmp -Wall -O3 -L. -z defs"
 endif
 
 # Debug object for utils, should be removed in favour of planck objects soon..
