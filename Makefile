@@ -47,7 +47,6 @@ OPT += -DHDF5
 
 #--------------------------------------- Client server model
 OPT += -DCLIENT_SERVER
-OPT += -DUSE_WEBSOCKETS
 # Uncomment this to request a username on load
 #OPT += -DSERVER_USERNAME_REQUEST
 
@@ -460,12 +459,7 @@ endif
 #
 # Uncomment below to use Programmable Pipeline rendering using Vertex Buffer Objects and shaders + geometry shader + FBOs + post processing filtering effects
 #----------------------------------
-#RENDER_METHOD = -DRENDER_PP_FBOF
-#----------------------------------
-#
-# Uncomment below to use the previewer as a remote viewer tool for Splotch (Only valid with CLIENT_SERVER on)
-#----------------------------------
-RENDER_METHOD = -DREMOTE_VIEWER
+RENDER_METHOD = -DRENDER_PP_FBOF
 #----------------------------------
 #
 # Uncomment for previewer DEBUG mode
@@ -507,14 +501,6 @@ ifeq ($(RENDER_METHOD),-DRENDER_PP_FBOF)
             previewer/libs/core/Fbo.o
 endif
 
-ifeq ($(RENDER_METHOD),-DREMOTE_VIEWER)
-
-ifeq (USE_WEBSOCKETS, $(findstring USE_WEBSOCKETS,$(OPT)))
-$(error Options mismatch; If PREVIEWER enabled and REMOTE_VIEWER chosen as render method (to use with Splotch Server), \
-  the server must use ZMQ communication protocol not websockets, i.e.  USE_WEBSOCKETS must be disabled (commented in options))
-endif
-	OBJS_BUILD_SPECIFIC = previewer/libs/renderers/RemoteViewer.o 
-endif
 
 OBJS +=   previewer/Previewer.o previewer/libs/core/Parameter.o previewer/libs/core/ParticleSimulation.o \
           previewer/libs/core/WindowManager.o previewer/libs/core/Camera.o previewer/libs/core/ParticleData.o \

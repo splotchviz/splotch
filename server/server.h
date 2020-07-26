@@ -21,12 +21,7 @@
 #include "command.h"
 #include "interface.h"
 
-#ifdef USE_WEBSOCKETS
 #include "WSocketMServer.h"
-#else
-#include "RAWOutStream.h"
-#include "AsyncServer.h"  
-#endif
 
 #include "SyncQueue.h"
 #define ZRF_int32_size
@@ -71,14 +66,13 @@ public:
   fast_timer ft;
   std::vector<char> image_buffer;
 
-#ifdef USE_WEBSOCKETS
   WSocketMServer< EventQueue& >* ims;
   WSocketMServer< CommandQueue& >* ctl;
   std::string wsocket_image_protocol;
   std::string wsocket_control_protocol;
   const int wsControlStreamPort = 8882;
   const int wsImageStreamPort = 8881;
-#endif
+
 
   interface_descriptor interface;
   long n_particles;
@@ -122,16 +116,6 @@ private:
   bool server_active    = false;
   bool server_passive   = false;
   paramfile* params;
-
-  // Communication
-#ifndef USE_WEBSOCKETS
-  // Output stream for streaming images to client
-  zrf::RAWOutStream<> os;
-  // Async server for recieving events from client
-  zrf::AsyncServer<>  as;
-  std::string         euri;
-  std::string         iuri;
-#endif
 
   // Scene
   std::string current_file    = "";

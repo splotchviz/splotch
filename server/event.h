@@ -6,9 +6,7 @@
 #include "observe.h"
 #define ZRF_int32_size
 #include "Serialize.h"
-#ifdef USE_WEBSOCKETS
 #include "WSocketMServer.h"
-#endif
 
 // // Server commands (ids of command events)
 // enum class CommandId: int { NULL_CMD = 0, HELP = 1, SET = 2, GET = 3, ADD = 4, SAVE = 5, 
@@ -190,7 +188,6 @@ private:
 class EventQueue
 {
 public:
-#ifdef USE_WEBSOCKETS
   // To add events arriving via websocket
    void operator()(WSSTATE s, ClientId cid, const char* in, int len, bool, bool)
    {
@@ -209,7 +206,6 @@ public:
       int temp_cid = 0;
       add_event(in, len, temp_cid);
    }
-#endif
 
   // To add events arriving from anywhere else
   void operator()(const char* e, int len, int cid)

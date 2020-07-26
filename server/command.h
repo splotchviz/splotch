@@ -28,7 +28,6 @@ struct JsonRPC{
 class CommandQueue
 {
 public:
-#ifdef USE_WEBSOCKETS
   // To add events arriving via websocket
    void operator()(WSSTATE s, ClientId clid, const char* in, int len, bool, bool){
       // Check if we are simply connecting/disconnecting
@@ -42,7 +41,6 @@ public:
       }
       add_cmd(in, len, clid, eid);
    }
-#endif
 
   bool empty(){
     return q.Empty();

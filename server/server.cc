@@ -103,17 +103,9 @@ void SplotchServer::init(paramfile& p, bool master)
  
 
   // Communication setup
-  // Initialize the event queues with syncqueue each
- // ims_ev_queue = EventQueue(&ims_sq);
-  //ctl_ev_queue = EventQueue(&ctl_sq);
-  // Implementation specific protocols
-#ifdef USE_WEBSOCKETS
   wsocket_image_protocol = "splotch-image-stream-protocol";
   wsocket_control_protocol = "splotch-control-protocol";
-#else
-  iuri = params->find<std::string>("image_uri");
-  euri = params->find<std::string>("event_uri");
-#endif
+
   // Launch servers and services
   init_comms();
   launch_image_services();
@@ -228,17 +220,11 @@ void SplotchServer::run(sceneMaker& sMaker, std::vector<particle_sim> &particle_
         for (int i=0; i<rc.xres; ++i)
         {
           int yidx = rc.yres - j - 1;
-#ifdef USE_WEBSOCKETS
           // For websockets we must also flip the image around horizontal axis
           // Logic here could be simplified
           buf[(yidx*rc.xres+i)*3  ]=(unsigned char)(rc.pic[i][yidx].r * 255);
           buf[(yidx*rc.xres+i)*3+1]=(unsigned char)(rc.pic[i][yidx].g * 255);
           buf[(yidx*rc.xres+i)*3+2]=(unsigned char)(rc.pic[i][yidx].b * 255);         
-#else
-          buf[(j*rc.xres+i)*3  ]=(unsigned char)(rc.pic[i][yidx].r * 255);
-          buf[(j*rc.xres+i)*3+1]=(unsigned char)(rc.pic[i][yidx].g * 255);
-          buf[(j*rc.xres+i)*3+2]=(unsigned char)(rc.pic[i][yidx].b * 255);
-#endif
         }        
       }
     }
@@ -732,12 +718,6 @@ void SplotchServer::finalize()
 {
   if(server_active) 
   {
-    #ifndef USE_WEBSOCKETS
-    // Close ZMQ services
-    os.Stop();
-    as.Stop();
-    eventreceive_thread.join();
-    #endif
     // Wait for service threads
     eventsend_thread.join();
     imagesend_thread.join();
@@ -785,7 +765,6 @@ int SplotchServer::get_yres()
 // Any setup thats needed for communication
 void SplotchServer::init_comms()
 {
-  #ifdef USE_WEBSOCKETS
   // Set websockets logging levels
   lws_set_log_level(LLL_ERR, nullptr);
   lws_set_log_level(LLL_WARN, nullptr);
@@ -819,10 +798,6 @@ void SplotchServer::init_comms()
                     false, //recycle memory
                     0x1000, //input buffer size
                     0);  //min interval between sends in ms
-  #else
-  // Launch the ZMQ output stream
-  if(!os.Started()) os.Start(iuri.c_str());
-  #endif
 }
 
 // Launch the asynuc services for sending/receiving events
@@ -831,7 +806,6 @@ void SplotchServer::launch_event_services()
   // The event sending service
   auto eventsender = [this]() {
   while(server_active){
-        #ifdef USE_WEBSOCKETS
          //std::cout << "ctl connected clients: " <<ctl->ConnectedClients() << std::endl;
          if(ctl->ConnectedClients()>0){ 
             std::tuple<ClientId, WSMSGTYPE, std::vector<unsigned char> > tosend  = commands.sender.Pop();
@@ -840,26 +814,9 @@ void SplotchServer::launch_event_services()
          else{
           std::this_thread::sleep_for(std::chrono::milliseconds(100));
          } 
-        #else 
-             // ZMQ ...
-        #endif
       }
     };
     eventsend_thread = std::thread(eventsender);
-  // For ZMQ we need to setup a separate event receiving service
-  // For websockets this is handled by the WSocketMServer so no need to set up manually
-  #ifndef USE_WEBSOCKETS  
-  // Create event handling service
-  auto service = [this](const zrf::ByteArray& req) {
-        ////printf("Service: Recieved %i bytes\n", req.size());
-        // No cid yet for zrf, just provide 0
-        if(req.size()){
-          cmd_queue(&req[0], req.size(), 0);
-        }
-    };
-    // Lauch server with service
-    eventreceive_thread = std::thread([&service,this]{as.Start(euri.c_str(), service);});
-  #endif
 }
 
 // Launch the async services for image sending
@@ -878,20 +835,8 @@ void SplotchServer::launch_image_services()
     #endif
     while(server_active) 
     {
-      #ifdef USE_TJ_COMPRESSION
       jpegImage = comp.Compress(std::move(jpegImage), (const unsigned char*) &(ims_send_queue.Pop())[0], xres, yres, TJPF_RGB, TJSAMP_420, quality);
-        #ifdef USE_WEBSOCKETS
         if(ims->ConnectedClients()>0) ims->Push(SerializeJPEGImage::PackDataOnlyWeb(jpegImage), false);
-        #else 
-        os.Send(SerializeJPEGImage::Pack(jpegImage));
-        #endif
-     #else
-        #ifdef USE_WEBSOCKETS
-        // Websockets uncompressed send()
-        #else  
-        os.Send( ims_send_queue.Pop());   
-        #endif
-      #endif
     }
   };
   imagesend_thread = std::thread(imagesender);
@@ -1578,27 +1523,10 @@ rapidjson::Value SplotchServer::cmd_get_image(ClientId clid, rapidjson::Document
   int dlid =0;
       dlid = clients->retrieve(active_client).download_id++;
 
-  // // Pack current image in the same way as image services
-  //   #ifdef USE_TJ_COMPRESSION
-     tjpp::JPEGImage jpegImage;
-     tjpp::TJCompressor comp;
-     jpegImage.Reset(xres,yres,TJPF_RGB,TJSAMP_420,quality);
-     jpegImage = comp.Compress(std::move(jpegImage), (const unsigned char*) &image_buffer[0], xres, yres, TJPF_RGB, TJSAMP_420, quality);
-  //     #ifdef USE_WEBSOCKETS
-  //       // Store this somehow 
-  //       // SerializeJPEGImage::PackDataOnlyWeb(jpegImage);
-  //     #else 
-  //     // os.Send(SerializeJPEGImage::Pack(jpegImage));
-  //     #endif
-  //  #else
-  //     #ifdef USE_WEBSOCKETS
-  //     // Websockets uncompressed send()
-  //     #else  
-  //     os.Send( ims_send_queue.Pop());   
-  //     #endif
-  //   #endif
-  
-
+    tjpp::JPEGImage jpegImage;
+    tjpp::TJCompressor comp;
+    jpegImage.Reset(xres,yres,TJPF_RGB,TJSAMP_420,quality);
+    jpegImage = comp.Compress(std::move(jpegImage), (const unsigned char*) &image_buffer[0], xres, yres, TJPF_RGB, TJSAMP_420, quality);
 
   // Trigger a binary download notification 
   notify_binary_download(clid, SerializeJPEGImage::PackDataOnlyWeb(jpegImage));
