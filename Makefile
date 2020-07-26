@@ -9,7 +9,7 @@
 #OPT += -DLONGIDS
 
 #--------------------------------------- Switch on HDF5
-OPT += -DHDF5
+#OPT += -DHDF5
 #OPT += -DH5_USE_16_API
 
 #---------------------------------------- Enable FITSIO
@@ -46,13 +46,13 @@ OPT += -DHDF5
 #OPT += -DINDEPENDENT_A
 
 #--------------------------------------- Client server model
-OPT += -DCLIENT_SERVER
+#OPT += -DCLIENT_SERVER
 # Uncomment this to request a username on load
 #OPT += -DSERVER_USERNAME_REQUEST
 
 #--------------------------------------- Select target Computer
-#SYSTYPE="generic"
-SYSTYPE="mac"
+SYSTYPE="generic"
+#SYSTYPE="mac"
 #SYSTYPE="Linux-cluster"
 #SYSTYPE="DAINT"
 #SYSTYPE="GSTAR"
