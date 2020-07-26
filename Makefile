@@ -47,12 +47,9 @@ OPT += -DHDF5
 
 #--------------------------------------- Client server model
 OPT += -DCLIENT_SERVER
+OPT += -DUSE_WEBSOCKETS
 # Uncomment this to request a username on load
 #OPT += -DSERVER_USERNAME_REQUEST
-
-# Use websocket based communication protocol
-# If commented, default to ZMQ based communication
-OPT += -DUSE_WEBSOCKETS
 
 #--------------------------------------- Select target Computer
 #SYSTYPE="generic"
@@ -86,18 +83,33 @@ endif
 SUP_INCL = -I. -Icxxsupport -Ic_utils -Ivectorclass
 
 # optimization and warning flags (g++)
-OPTIMIZE = -Ofast -std=c++11 -pedantic -Wno-long-long -Wfatal-errors -Wextra -Wall -Wstrict-aliasing=2 -Wundef -Wshadow -Wwrite-strings -Wredundant-decls -Woverloaded-virtual -Wcast-qual -Wcast-align -Wpointer-arith -march=native 
+OPTIMIZE = -Ofast -std=c++11 -pedantic -Wno-long-long -Wfatal-errors           \
+           -Wextra -Wall -Wstrict-aliasing=2 -Wundef -Wshadow -Wwrite-strings  \
+           -Wredundant-decls -Woverloaded-virtual -Wcast-qual -Wcast-align     \
+           -Wpointer-arith -march=native 
 
-# -O0 -g -std=c++11
-#-pedantic -Wno-long-long -Wfatal-errors -Wextra -Wall -Wstrict-aliasing=2 -Wundef -Wshadow -Wwrite-strings -Wredundant-decls -Woverloaded-virtual -Wcast-qual -Wcast-align -Wpointer-arith  -march=native 
-#-Wno-newline-eof -g
-#-Wold-style-cast -std=c++11
-
+# MPIIO library 
 ifeq (USE_MPIIO,$(findstring USE_MPIIO,$(OPT)))
  SUP_INCL += -Impiio-1.0/include/
  LIB_MPIIO = -Lmpiio-1.0/lib -lpartition
 endif
 
+# Default paths for client-server dependencies 
+ifeq (CLIENT_SERVER,$(findstring CLIENT_SERVER,$(OPT)))
+    # LibWebsockets
+    LWS_PATH = server/dep/LibWebsockets
+    LIB_OPT +=  -L$(LWS_PATH)/lib -lwebsockets
+    SUP_INCL += -I$(WSP_PATH)/include -I$(LWS_PATH)/include
+    # LibTurboJPEG
+    LIBTURBOJPEG_PATH = server/dep/libjpeg-turbo
+    # RapidJSON
+    RAPIDJSON_PATH 		= server/dep
+    # WSRTI
+    WSRTI_PATH = server/dep/WSRTI
+  endif
+
+
+#--------------------------------------- Specific configs per system type
 
 ifeq ($(SYSTYPE),"generic")
   # OPTIMIZE += -O2 -g -D TWOGALAXIES
@@ -151,33 +163,9 @@ ifeq ($(SYSTYPE),"mac")
     	CC = mpic++
   endif
   ifeq (HDF5,$(findstring HDF5,$(OPT)))
-    HDF5_HOME = /opt/local
+    HDF5_HOME = /usr/local
     LIB_HDF5  = -L$(HDF5_HOME)/lib -Wl,-rpath,$(HDF5_HOME)/lib -lhdf5 -lz
     HDF5_INCL = -I$(HDF5_HOME)/include
-  endif
-  ifeq (CLIENT_SERVER,$(findstring CLIENT_SERVER,$(OPT)))
-    ifeq (USE_WEBSOCKETS, $(findstring USE_WEBSOCKETS,$(OPT)))
-      # Websockets + c++ wrapper library definitions
-      LWS_PATH = dep/libwebsockets
-      WSP_PATH = dep/WSRTI/websocketplus
-      LIB_OPT +=  -L$(LWS_PATH)/lib -lwebsockets
-      SUP_INCL += -I$(WSP_PATH)/include -I$(LWS_PATH)/include
-    else
-      # ZeroMQ definitions (DEPRECATED)
-#      ZMQ_PATH = /home/users/tdykes/zmq
-#      ZRF_PATH = /Users/tims/Work/Cray/zrf
-#      LIB_OPT += -L$(ZMQ_PATH)/lib -lzmq 
-#      SUP_INCL += -I$(ZMQ_PATH)/include -I$(ZRF_PATH)/src/include  -I$(ZRF_PATH)/dep/syncqueue
-    endif
-    SYNCQUEUE_PATH = dep/WSRTI/syncqueue
-    TJPP_PATH = dep/WSRTI/tjpp
-    SRZ_PATH = dep/WSRTI/serializer
-    LIBTURBOJPEG_PATH = ./dep/libjpeg-turbo
-    RAPIDJSON_PATH 		= dep
-
-    LIB_OPT += -L $(LIBTURBOJPEG_PATH)/install/lib -lturbojpeg
-    SUP_INCL += -I$(TJPP_PATH)/include -I$(LIBTURBOJPEG_PATH) -I$(SYNCQUEUE_PATH) -I$(SRZ_PATH)/include \
-    						-I$(RAPIDJSON_PATH) 
   endif
   ifeq (FITS,$(findstring FITS,$(OPT)))
   	LIB_OPT  +=  -L/Users/tims/Code/cfitsio/lib
@@ -227,30 +215,6 @@ ifeq ($(SYSTYPE), "DAINT")
     LIB_HDF5  = -L$(HDF5_HOME)lib -Wl,-rpath,$(HDF5_HOME)/lib -lhdf5 -lz
     HDF5_INCL = -I$(HDF5_HOME)include
   endif
-  ifeq (CLIENT_SERVER,$(findstring CLIENT_SERVER,$(OPT)))
-    ifeq (USE_WEBSOCKETS, $(findstring USE_WEBSOCKETS,$(OPT)))
-      # Websockets + c++ wrapper library definitions
-      LWS_PATH = dep/libwebsockets
-      WSP_PATH = dep/websocketplus
-      LIB_OPT += -dynamic -L$(LWS_PATH)/lib -lwebsockets 
-#-L/Users/tims/Code/libwebsockets/lib -lwebsockets
-      SUP_INCL += -I$(WSP_PATH)/include  -I$(LWS_PATH)/include
-#-I/Users/tims/Code/libwebsockets/lib
-    else
-      # ZeroMQ definitions
-#	ZMQ_PATH = /home/users/tdykes/zmq
-#	ZRF_PATH = /home/users/tdykes/zrf
-#      LIB_OPT += -L$(ZMQ_PATH)/lib -lzmq 
-#      SUP_INCL += -I$(ZMQ_PATH)/include -I$(ZRF_PATH)/src/include  -I$(ZRF_PATH)/dep/syncqueue
-    endif
-    SYNCQUEUE_PATH = dep/syncqueue
-    TJPP_PATH = dep/tjpp
-    LIBTURBOJPEG_PATH = dep/libjpeg-turbo-1.5.0
-    SRZ_PATH = dep/serializer
-    RAPIDJSON_PATH 		= dep
-    LIB_OPT  += -L$(LIBTURBOJPEG_PATH)/.libs -lturbojpeg
-    SUP_INCL += -I$(SYNCQUEUE_PATH) -I$(SRZ_PATH)/include -I$(TJPP_PATH)/include -I$(LIBTURBOJPEG_PATH) -I$(RAPIDJSON_PATH)
-  endif
 endif
 
 # XC40 with GPUs
@@ -270,16 +234,6 @@ ifeq ($(SYSTYPE), "tiger")
     HDF5_HOME = /opt/cray/hdf5-parallel/1.8.13/gnu/48/
     LIB_HDF5  = -L$(HDF5_HOME)lib -Wl,-rpath,$(HDF5_HOME)/lib -lhdf5 -lz
     HDF5_INCL = -I$(HDF5_HOME)include
-  endif
-  ifeq (CLIENT_SERVER,$(findstring CLIENT_SERVER,$(OPT)))
-	ZMQ_PATH = /cray/css/users/tdykes/zmq-gcc-4.9.3
-	ZRF_PATH = /cray/css/users/tdykes/zrf
-	TJPP_PATH = /cray/css/users/tdykes/tjpp
-	LIBTURBOJPEG_PATH = /cray/css/users/tdykes/libjpeg-turbo-1.5.0
-	
-	SUP_INCL += -I$(ZMQ_PATH)/include -I$(TJPP_PATH)/include -I$(LIBTURBOJPEG_PATH)
-	LIB_OPT += -L$(ZMQ_PATH)/lib -lzmq -L$(LIBTURBOJPEG_PATH)/.libs -lturbojpeg
-	SUP_INCL += -I$(ZRF_PATH)/src/include -I$(ZRF_PATH)/dep/syncqueue
   endif
 endif
 
@@ -301,11 +255,6 @@ ifeq ($(SYSTYPE), "XC30-CCE")
   LIB_HDF5  = -L$(HDF5_HOME)lib -Wl,-rpath,$(HDF5_HOME)/lib -lhdf5 -lz
   HDF5_INCL = -I$(HDF5_HOME)include
   endif 
-  ifeq (CLIENT_SERVER,$(findstring CLIENT_SERVER,$(OPT)))
-	ZMQ_PATH = /cray/css/users/tdykes/zmq-cray
-	SUP_INCL += -I$(ZMQ_PATH)/include
-	LIB_OPT += -L$(ZMQ_PATH)/lib
-  endif
 endif
 
 ifeq ($(SYSTYPE),"GSTAR")
@@ -381,22 +330,11 @@ ifeq ($(SYSTYPE),"RZG-SLES11-generic")
 endif
 
 
-# Configuration for generic mic cluster
+# Configuration for generic mic cluster native/offload
 ifeq ($(SYSTYPE),"MIC-native")
   CC = CC -xmic-avx512 -Ofast -g
   #-vec-report6
   OPTIMIZE = -std=c++11
-
-	ZMQ_PATH = /cray/css/users/tdykes/zmq-mic
-	ZRF_PATH = /cray/css/users/tdykes/zrf
-	TJPP_PATH = /cray/css/users/tdykes/tjpp
-	LIBTURBOJPEG_PATH = /cray/css/users/tdykes/libjpeg-turbo-1.5.0
-	
-	SUP_INCL += -I$(ZMQ_PATH)/include -I$(TJPP_PATH)/include -I$(LIBTURBOJPEG_PATH)
-	LIB_OPT += -L$(ZMQ_PATH)/lib -lzmq -L$(LIBTURBOJPEG_PATH)/.libs -lturbojpeg
-	SUP_INCL += -I$(ZRF_PATH)/src/include -I$(ZRF_PATH)/dep/syncqueue
-# -Wall
-#-pedantic -Wfatal-errors -Wextra -Wall -Wstrict-aliasing=2 -Wundef -Wshadow -Wwrite-strings -Woverloaded-virtual -Wcast-qual -Wpointer-arith
 endif
 
 ifeq ($(SYSTYPE),"MIC-offload")
@@ -411,32 +349,15 @@ ifeq ($(SYSTYPE),"MIC-offload")
   # -guide -parallel
 endif
 
-ifeq ($(SYSTYPE),"MIC-loon")
 
-  ifeq (USE_MPI,$(findstring USE_MPI,$(OPT)))
-   CC = mpiicpc
-  else
-   CC = icpc
-  endif
-  #-vec-report6
-  OPTIMIZE = -xmic-avx512 -O2 -g -std=c++11
-
-	ZMQ_PATH = /cray/css/users/tdykes/zmq-mic
-	ZRF_PATH = /cray/css/users/tdykes/zrf
-	TJPP_PATH = /cray/css/users/tdykes/tjpp
-	LIBTURBOJPEG_PATH = /cray/css/users/tdykes/libjpeg-turbo-1.5.0
-	
-	SUP_INCL += -I$(ZMQ_PATH)/include -I$(TJPP_PATH)/include -I$(LIBTURBOJPEG_PATH)
-	LIB_OPT += -L$(ZMQ_PATH)/lib -lzmq -L$(LIBTURBOJPEG_PATH)/.libs -lturbojpeg
-	SUP_INCL += -I$(ZRF_PATH)/src/include -I$(ZRF_PATH)/dep/syncqueue
-endif
+#--------------------------------------- Debug override 
 
 # Override all optimization settings for debug build
 ifeq ($(DEBUG), 1)
 OPTIMIZE = -g -O0 -std=c++11
 endif
 
-#--------------------------------------- Here we go
+#--------------------------------------- Build config
 
 OPTIONS = $(OPTIMIZE) $(OPT)
 
@@ -497,12 +418,21 @@ ifeq (MPI_A_NEQ_E, $(findstring MPI_A_NEQ_E,$(OPT)))
 OBJS += utils/debug.o utils/composite.o
 endif
 
-# 
+# Client server objects, includes, and libraries
 ifeq (CLIENT_SERVER, $(findstring CLIENT_SERVER,$(OPT)))
+
 OBJS += server/server.o server/controller.o server/data.o
 ifneq (PREVIEWER, $(findstring PREVIEWER,$(OPT)))
 OBJS += previewer/libs/core/Camera.o previewer/libs/core/MathLib.o previewer/libs/events/actions/CameraAction.o
 endif
+
+LIB_OPT += -L$(LIBTURBOJPEG_PATH)/install/lib -lturbojpeg                \
+            -L$(LWS_PATH)/lib -lwebsockets
+
+SUP_INCL += -I$(LWS_PATH)/include -I$(LIBTURBOJPEG_PATH)                  \
+            -I$(RAPIDJSON_PATH) -I$(WSRTI_PATH)/websocketplus/include     \
+            -I$(WSRTI_PATH)/tjpp/include -I$(WSRTI_PATH)/syncqueue        \
+            -I$(WSRTI_PATH)/serializer/include 
 endif
 
 ##################################################
