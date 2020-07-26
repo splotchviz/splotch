@@ -23,7 +23,6 @@
 #define SPLOTCH_PREVIEWER_LIBS_RENDERERS_REMOTE_VIEWER
 
 #define GL_GLEXT_PROTOTYPES
-#define USE_TJ_COMPRESSION
 
 #include "IRenderer.h"
 #include "previewer/libs/core/Camera.h"
@@ -42,10 +41,9 @@
 #include "AsyncClient.h"
 #include "SyncQueue.h"
 
-#ifdef USE_TJ_COMPRESSION
 #include "JPEGImage.h"
 #include "TJDeCompressor.h"
-#endif
+
 
 
  namespace previewer
@@ -81,11 +79,7 @@
 		zrf::RAWInStream<> is;
 		std::thread recv_thread;
 		std::string image_uri;
-#ifdef USE_TJ_COMPRESSION
 		SyncQueue<tjpp::Image> image_queue;
-#else
-		SyncQueue<std::vector<char>> image_queue;
-#endif
 
 		// Event sending
 		zrf::AsyncClient<> ac;

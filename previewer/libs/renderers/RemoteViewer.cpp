@@ -155,27 +155,17 @@ void UnPack(const srz::ByteArray& ba, tjpp::JPEGImage& d) {
                 ft.mark(0);
             }
 
-#ifdef USE_TJ_COMPRESSION
             tjpp::Image im(std::move(image_queue.Pop()));
-#else
-            std::vector<char> v = image_queue.Pop();
-#endif
+
             if(first_image)
             {
-#ifdef USE_TJ_COMPRESSION
+
                 renderMaterial->LoadTexture(im.DataPtr(), xres, yres, GL_TEXTURE_2D, GL_RGB, GL_UNSIGNED_BYTE); 
-#else
-                renderMaterial->LoadTexture(&v[0], xres, yres, GL_TEXTURE_2D, GL_RGB, GL_UNSIGNED_BYTE); 
-#endif
                 first_image=false;
             }
             else
             {
-#ifdef USE_TJ_COMPRESSION
                 renderMaterial->ReplaceTexture(im.DataPtr(), xres, yres); 
-#else
-                renderMaterial->ReplaceTexture(&v[0], xres, yres); 
-#endif
             }
             if(ic>1) ParticleSimulation::rendererUpdated = false;
             if(ctr > 1024) ctr-=1024;
@@ -241,25 +231,18 @@ void UnPack(const srz::ByteArray& ba, tjpp::JPEGImage& d) {
         // Listen for incoming images, buffer size is max uncompressed image
         if(!is.Started()) is.Start(image_uri.c_str(), size, 15000);
 
-#ifdef USE_TJ_COMPRESSION
         tjpp::TJDeCompressor decomp(1920 * 1080 * 4 * 4); //up to RGBX 4k support
         tjpp::JPEGImage jpi;
-#else
-        // Some dummies to pass into lambda
-        int jpi,decomp;
-#endif
+
         // use uri = "tcp://<hostname or address>:port" to connect
         is.Loop([this,size,&decomp,&jpi](const std::vector< char >& v) {
             if(!v.empty()) 
             {
                 //printf("RemoteViewer: recieved %lu bytes (v.size()), max buffer size %d\n",v.size(), size);
                 //ft.mark(1, "Time since last recieve: us");
-#ifdef USE_TJ_COMPRESSION
                 UnPack(v, jpi);
                 image_queue.Push(decomp.DeCompress(jpi.DataPtr(), jpi.CompressedSize(), jpi.PixelFormat()));
-#else
-                image_queue.Push(v);
-#endif
+
                 //printf("queue.size(): %i\n",image_queue.Size());
                 ParticleSimulation::rendererUpdated = false;
             }

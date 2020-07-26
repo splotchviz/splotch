@@ -29,7 +29,6 @@
 
 #include "fast_timer.h"
 #include "data.h"
-#define USE_TJ_COMPRESSION
 
 class SplotchServer
 {

@@ -6,20 +6,17 @@
 #include "splotch/splotch_host.h"
 #include "json_maker.h"
 #include "rapidjson/prettywriter.h"
-
-#ifdef USE_TJ_COMPRESSION
 #include "TJCompressor.h"
 #include "JPEGImage.h"
-#endif
+
 
 #ifdef USE_MPI
 #include "mpi.h"
 #endif
 
 
-#ifdef USE_TJ_COMPRESSION
 //! Specialization for JPEGImage from tjpp library
-// This should be tidied up, may not even need WEB_BYTEARRAY, use ZRF_UNSIGNED_CHAR?
+// May not need WEB_BYTEARRAY, use ZRF_UNSIGNED_CHAR?
 struct SerializeJPEGImage {
     using SS = srz::SerializePOD< size_t >;
     using WEB_BYTEARRAY = std::vector<unsigned char>;
@@ -63,7 +60,6 @@ struct SerializeJPEGImage {
 void UnPack(const srz::ByteArray& ba, tjpp::JPEGImage& d) {
     SerializeJPEGImage::UnPack(ba.begin(), d);
 }
-#endif
 
 void SplotchServer::init(paramfile& p, bool master)
 {
@@ -822,17 +818,14 @@ void SplotchServer::launch_event_services()
 // Launch the async services for image sending
 void SplotchServer::launch_image_services()
 {
-  #ifdef USE_TJ_COMPRESSION
   quality = params->find<int>("tjpp_quality",95);
-  #endif
+
 
   // Create image sending service
   auto imagesender = [this]() {
-    #ifdef USE_TJ_COMPRESSION
     tjpp::JPEGImage jpegImage;
     tjpp::TJCompressor comp;
     jpegImage.Reset(xres,yres,TJPF_RGB,TJSAMP_420,quality);
-    #endif
     while(server_active) 
     {
       jpegImage = comp.Compress(std::move(jpegImage), (const unsigned char*) &(ims_send_queue.Pop())[0], xres, yres, TJPF_RGB, TJSAMP_420, quality);
