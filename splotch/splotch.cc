@@ -37,9 +37,6 @@
 #ifdef CUDA
 #include "cuda/cuda_splotch.h"
 #endif
-#ifdef OPENCL
-#include "opencl/splotch_cuda2.h"
-#endif
 
 #ifdef PREVIEWER
 #include "previewer/simple_gui/SimpleGUI.h"
@@ -257,11 +254,6 @@ int main (int argc, const char **argv)
         tstack_push("CUDA");
         cuda_rendering(context.mydevID, context.nTasksDev, context.pic, *pData, context.campos, context.centerpos, context.lookat, context.sky, context.amap, context.b_brightness, params, context.cv);
         tstack_pop("CUDA");
-#endif
-#ifdef OPENCL
-        tstack_push("OPENCL");
-        opencl_rendering(mydevID, *pData, nDevProc, context.pic);
-        tstack_pop("OPENCL");
 #endif
       }
       else

@@ -23,10 +23,6 @@
 #OPT += -DCUDA
 #OPT += -DHYPERQ
 
-#--------------------------------------- OpenCL options
-#OPT += -DOPENCL
-#OPT += -DNO_WIN_THREAD
-
 #--------------------------------------- Switch on Previewer
 #OPT += -DPREVIEWER
 
@@ -179,10 +175,6 @@ ifeq ($(SYSTYPE),"Linux-cluster")
   NVCCARCH = -arch=sm_30
   NVCCFLAGS = -g  $(NVCCARCH) -dc -use_fast_math -std=c++11
   LIB_OPT  =  -L$(CUDA_HOME)/lib64 -lcudart
-  SUP_INCL += -I$(CUDA_HOME)/include
-  endif
-  ifeq (OPENCL,$(findstring OPENCL,$(OPT)))
-  LIB_OPT  =  -L$(CUDA_HOME)/lib64 -L$(CUDA_HOME)/lib -lOpenCL
   SUP_INCL += -I$(CUDA_HOME)/include
   endif
 endif
@@ -367,15 +359,12 @@ ifeq (FITS,$(findstring FITS,$(OPT)))
   LIB_FITSIO = -lcfitsio
 endif
 
-# OpenCL and CUDA config
-ifeq (OPENCL,$(findstring OPENCL,$(OPT)))
-  OBJS += opencl/splotch.o opencl/CuPolicy.o opencl/splotch_cuda2.o opencl/deviceQuery.o
-else
-  ifeq (CUDA,$(findstring CUDA,$(OPT)))
-  OBJS += cuda/cuda_splotch.o cuda/cuda_policy.o cuda/cuda_utils.o cuda/cuda_device_query.o cuda/cuda_kernel.o cuda/cuda_render.o
-  CULINK = cuda/cuda_link.o
-  endif
+# CUDA config
+ifeq (CUDA,$(findstring CUDA,$(OPT)))
+OBJS += cuda/cuda_splotch.o cuda/cuda_policy.o cuda/cuda_utils.o cuda/cuda_device_query.o cuda/cuda_kernel.o cuda/cuda_render.o
+CULINK = cuda/cuda_link.o
 endif
+
 
 # Debug object for utils, should be removed in favour of planck objects soon..
 ifeq (MPI_A_NEQ_E, $(findstring MPI_A_NEQ_E,$(OPT)))
