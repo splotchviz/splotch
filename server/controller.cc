@@ -39,6 +39,8 @@
     }  
   }
 
+  // Client support is experimental, default client hardcoded here. 
+  // Full client support reads this client data from an input file.
   void ClientController::load_default_client()
   {
     clients[""] = ClientData();
