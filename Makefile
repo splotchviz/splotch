@@ -23,9 +23,6 @@
 #OPT += -DCUDA
 #OPT += -DHYPERQ
 
-#--------------------------------------- Switch on Previewer
-#OPT += -DPREVIEWER
-
 #--------------------------------------- Turn on VisIVO stuff
 #OPT += -DSPLVISIVO
 
@@ -374,10 +371,9 @@ endif
 # Client server objects, includes, and libraries
 ifeq (CLIENT_SERVER, $(findstring CLIENT_SERVER,$(OPT)))
 
-OBJS += server/server.o server/controller.o server/data.o
-ifneq (PREVIEWER, $(findstring PREVIEWER,$(OPT)))
-OBJS += previewer/libs/core/Camera.o previewer/libs/core/MathLib.o previewer/libs/events/actions/CameraAction.o
-endif
+OBJS += server/server.o server/controller.o server/data.o                 \
+        server/camera.o server/matrix4.o
+
 
 LIB_OPT += -L$(LIBTURBOJPEG_PATH)/install/lib -lturbojpeg                \
             -L$(LWS_PATH)/lib -lwebsockets
@@ -386,95 +382,6 @@ SUP_INCL += -I$(LWS_PATH)/include -I$(LIBTURBOJPEG_PATH)                  \
             -I$(RAPIDJSON_PATH) -I$(WSRTI_PATH)/websocketplus/include     \
             -I$(WSRTI_PATH)/tjpp/include -I$(WSRTI_PATH)/syncqueue        \
             -I$(WSRTI_PATH)/serializer/include 
-endif
-
-##################################################
-#        SPLOTCH PREVIEWER SECTION
-##################################################
-
-# Please choose rendering method. Choice will depend on your current drivers, OpenGL implementation and hardware capabilities
-# PPFBO is recommended, but if your implementation does not support framebuffer objects try PPGEOM, if that is also not supported
-# use FFSVBO, this uses the fixed function pipeline and should be available on most if not all hardware setups that support opengl.
-#
-# Uncomment below to use Fixed Function software rendering with Vertex Buffer Objects (faster method if no hardware acceleration)
-#----------------------------------
-#RENDER_METHOD = -DRENDER_FF_VBO
-#----------------------------------
-#
-# Uncomment below to use Programmable Pipeline rendering using Vertex Buffer Objects and shaders + geometry shader
-#----------------------------------
-#RENDER_METHOD = -DRENDER_PP_GEOM
-#----------------------------------
-#
-# Uncomment below to use Programmable Pipeline rendering using Vertex Buffer Objects and shaders + geometry shader + FBOs
-#----------------------------------
-#RENDER_METHOD = -DRENDER_PP_FBO
-#----------------------------------
-#
-# Uncomment below to use Programmable Pipeline rendering using Vertex Buffer Objects and shaders + geometry shader + FBOs + post processing filtering effects
-#----------------------------------
-RENDER_METHOD = -DRENDER_PP_FBOF
-#----------------------------------
-#
-# Uncomment for previewer DEBUG mode
-#----------------------------------
- PREVIEWER_DEBUG = -DDEBUG_MODE=1
-#----------------------------------
-
-ifeq (PREVIEWER,$(findstring PREVIEWER,$(OPT)))
-# Link libs
-
-#ifeq ($SYSTYPE,"mac")
- LIB_OPT += -L/usr/X11/lib -lXext -lX11 -lGL
-#else
-# LIB_OPT += -lGL -lXext -lX11
-#endif
-
-# Current build specific settings
-# Build specific objects are added to OBJS list, depending on renderer choice
-# The current include for the auto-generated CurrentRenderer header file will be specified
-# The render mode will be added to options to be passed on to the application
-# To add a renderer, copy the if clause below and replace the object file and include file with your own
-# The RENDER_MODE *must* be the exact, case dependant, name of your renderer class.
-# Then add a render_method choice above
-ifeq ($(RENDER_METHOD),-DRENDER_FF_VBO)
-	OBJS_BUILD_SPECIFIC = previewer/libs/renderers/FF_VBO.o
-endif
-
-ifeq ($(RENDER_METHOD),-DRENDER_PP_GEOM)
-	OBJS_BUILD_SPECIFIC = previewer/libs/renderers/PP_GEOM.o previewer/libs/materials/PP_ParticleMaterial.o previewer/libs/core/Shader.o
-endif
-
-ifeq ($(RENDER_METHOD),-DRENDER_PP_FBO)
-	OBJS_BUILD_SPECIFIC = previewer/libs/renderers/PP_FBO.o previewer/libs/materials/PP_ParticleMaterial.o previewer/libs/core/Shader.o \
-            previewer/libs/core/Fbo.o
-endif
-
-ifeq ($(RENDER_METHOD),-DRENDER_PP_FBOF)
-	OBJS_BUILD_SPECIFIC = previewer/libs/renderers/PP_FBOF.o previewer/libs/materials/PP_ParticleMaterial.o previewer/libs/core/Shader.o \
-            previewer/libs/core/Fbo.o
-endif
-
-
-OBJS +=   previewer/Previewer.o previewer/libs/core/Parameter.o previewer/libs/core/ParticleSimulation.o \
-          previewer/libs/core/WindowManager.o previewer/libs/core/Camera.o previewer/libs/core/ParticleData.o \
-          previewer/libs/core/MathLib.o previewer/libs/core/FileLib.o previewer/libs/events/OnQuitApplicationEvent.o \
-          previewer/libs/events/OnKeyReleaseEvent.o previewer/libs/events/OnKeyPressEvent.o previewer/libs/events/OnExposedEvent.o \
-          previewer/libs/events/OnButtonReleaseEvent.o previewer/libs/events/OnButtonPressEvent.o previewer/libs/events/OnMotionEvent.o \
-          previewer/libs/core/Texture.o previewer/libs/animation/AnimationSimulation.o previewer/libs/core/Debug.o \
-          previewer/libs/events/actions/CameraAction.o previewer/libs/materials/FF_ParticleMaterial.o \
-          previewer/libs/animation/AnimationTypeLookUp.o  previewer/libs/core/Utils.o\
-          previewer/libs/animation/AnimationData.o previewer/libs/animation/AnimationPath.o \
-          previewer/simple_gui/GUIWindow.o previewer/simple_gui/SimpleGUI.o previewer/simple_gui/GUICommand.o
-
-OBJS += $(OBJS_BUILD_SPECIFIC)
-
-PREVIEWER_OPTS = $(RENDER_METHOD) $(PREVIEWER_DEBUG)
-
-##################################################
-#        END OF PREVIEWER SECTION
-##################################################
-
 endif
 
 INCL   = */*.h Makefile

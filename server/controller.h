@@ -1,7 +1,7 @@
 #ifndef SPLOTCH_CONTROLLER_H
 #define SPLOTCH_CONTROLLER_H
 
-#include "previewer/libs/core/Camera.h"
+#include "camera.h"
 #include "event.h"
 class SplotchServer;
 
@@ -121,7 +121,7 @@ public:
   bool active         = false;
 private: 
   // Camera
-  previewer::Camera camera;
+  Camera camera;
   float ideal_mspf  = 32; 
   float mouse_x     = 0;
   float mouse_y     = 0;
