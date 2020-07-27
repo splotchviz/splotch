@@ -35,7 +35,10 @@
 #include "cxxsupport/string_utils.h"
 #include "kernel/colour.h"
 #include "kernel/transform.h"
-#include "splotch/splotchutils.h"
+#include "cxxsupport/arr.h"
+#include "cxxsupport/colour.h"
+#include "cxxsupport/mpi_support.h"
+//#include "splotch/splotchutils.h"
 
 #include "cuda/cuda_policy.h"
 

@@ -28,6 +28,7 @@
 
 #include "cuda/cuda_utils.h"
 #include "cuda/cuda_render.h"
+#include "splotch/splotchutils.h"
 
 void cuda_rendercontext_init(paramfile& params, render_context& context);
 void cuda_renderer_init(int& mydevID, int nTasksDev, arr2<COLOUR> &pic, vector<particle_sim> &particle, vector<COLOURMAP> &amap, paramfile &g_params, cu_cpu_vars& cv);

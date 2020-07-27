@@ -37,14 +37,14 @@ void cuda_rendercontext_init(paramfile& params, render_context& context)
     // all processes in the same node share one GPU
     context.mydevID = 0;
     nTasksNode = params.find<int>("tasks_per_node",1); //number of processes per node
-    nTasksDev = nTasksNode;
-    if (master) cout << "HyperQ enabled" << endl;
+    context.nTasksDev = nTasksNode;
+    if (mpiMgr.master()) cout << "HyperQ enabled" << endl;
 #else
     // only the first nDevNode processes of the node will use a GPU, each exclusively.
     nTasksNode = params.find<int>("tasks_per_node",1); //number of processes per node
     context.mydevID = myID%nTasksNode; //ID within the node
-    nTasksDev = 1;
-    if (master)
+    context.nTasksDev = 1;
+    if (mpiMgr.master())
     {
        cout << "Configuration supported is 1 gpu for each mpi process" << endl;
        cout << "Each node has " << nTasksNode << " ranks, and " << nDevNode << " gpus." << endl;

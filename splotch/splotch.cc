@@ -245,25 +245,22 @@ int main (int argc, const char **argv)
        context.npart_all = context.npart;
        mpiMgr.allreduce (context.npart_all,MPI_Manager::Sum);
 
-#if (defined(CUDA) || defined(OPENCL))
+#ifdef CUDA       
       // CUDA or OPENCL rendering
-      if (mydevID >= 0)
+      if (context.mydevID >= 0)
       {
-#ifdef CUDA
         if (!a_eq_e) planck_fail("CUDA only supported for A==E so far");
         tstack_push("CUDA");
         cuda_rendering(context.mydevID, context.nTasksDev, context.pic, *pData, context.campos, context.centerpos, context.lookat, context.sky, context.amap, context.b_brightness, params, context.cv);
         tstack_pop("CUDA");
-#endif
       }
       else
       { 
+#endif
+        // Default host rendering
         host_rendering(params, *pData, context);
+#ifdef CUDA
       }
-#else
-      // Default host rendering
-      host_rendering(params, *pData, context);
-
 #endif
     }
 

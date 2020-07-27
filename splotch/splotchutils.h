@@ -29,6 +29,10 @@
 #include "kernel/colourmap.h"
 #include "cxxsupport/walltimer.h"
 
+#ifdef CUDA
+#include "cuda/cuda_utils.h"
+#endif
+
 #ifdef SPLVISIVO
 #include "optionssetter.h"
 #include "luteditor.h"
@@ -90,7 +94,6 @@ struct hcmp
   bool operator()(const particle_sim &p1, const particle_sim &p2) const
     { return p1.r>p2.r; }
 };
-
 
 struct render_context{
   // Camera and colormap

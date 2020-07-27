@@ -298,8 +298,9 @@ int get_device_image(arr2<COLOUR> &Pic_host, cu_gpu_vars* gv, int xres, int yres
   {
     cout << "Rank " << mpiMgr.rank() << " Image copy: Device Memcpy error!" << endl;
     printf("cudaMemcpy returned: %s\n",cudaGetErrorString(error));
-    return 0;
+    return 1;
   }
+   return 0;
 }
 
 int add_device_image(arr2<COLOUR> &Pic_host, cu_gpu_vars* gv, int xres, int yres, COLOUR* buf)
