@@ -2,6 +2,7 @@
   File reader for HDF5 data
   Implements IFile interface in reader.h
 */
+#ifdef HDF5
 
 #include "IFile.h"
 #include "hdf5.h"
@@ -577,7 +578,7 @@ private:
   std::vector<std::string>  fields;
 };
 
-
+#endif
     // // If the data is compound
     // bool compound = params.find<bool>("hdf5_compound", false);
     // if(compound){

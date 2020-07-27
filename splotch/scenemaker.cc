@@ -903,11 +903,13 @@ void sceneMaker::fetchFiles(vector<particle_sim> &particle_data, double fidx)
 #ifdef HDF5
     case 7:
     {
+#ifdef CLIENT_SERVER
       if(!file)
         file = new HDF5File();
       file->read(params, particle_data);
-
-      //hdf5_reader(params,particle_data);
+#else
+      hdf5_reader(params,particle_data);
+#endif
       break;
     }
     case 8:
