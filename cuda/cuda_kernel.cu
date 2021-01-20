@@ -104,12 +104,14 @@ __global__ void k_process(cu_particle_sim *p, int n, int mapSize, int types)
       if (dparams.cnorm_maxs[ptype]==dparams.cnorm_mins[ptype])
         eg = 1;
       else
-        eg = (max(dparams.cnorm_mins[ptype],min(dparams.cnorm_maxs[ptype],er))-dparams.cnorm_mins[ptype])/(dparams.cnorm_maxs[ptype]-dparams.cnorm_mins[ptype]);
+        //eg = (max(dparams.cnorm_mins[ptype],min(dparams.cnorm_maxs[ptype],er))-dparams.cnorm_mins[ptype])/(dparams.cnorm_maxs[ptype]-dparams.cnorm_mins[ptype]);
+        eg = (max(dparams.cnorm_mins[ptype],min(dparams.cnorm_maxs[ptype],eg))-dparams.cnorm_mins[ptype])/(dparams.cnorm_maxs[ptype]-dparams.cnorm_mins[ptype]);
 
       if (dparams.cnorm_maxs[ptype]==dparams.cnorm_mins[ptype])
         eb = 1;
       else
-        eb = (max(dparams.cnorm_mins[ptype],min(dparams.cnorm_maxs[ptype],er))-dparams.cnorm_mins[ptype])/(dparams.cnorm_maxs[ptype]-dparams.cnorm_mins[ptype]);
+        //eb = (max(dparams.cnorm_mins[ptype],min(dparams.cnorm_maxs[ptype],er))-dparams.cnorm_mins[ptype])/(dparams.cnorm_maxs[ptype]-dparams.cnorm_mins[ptype]);
+        eb = (max(dparams.cnorm_mins[ptype],min(dparams.cnorm_maxs[ptype],eb))-dparams.cnorm_mins[ptype])/(dparams.cnorm_maxs[ptype]-dparams.cnorm_mins[ptype]);
     }
 
   //now do x,y,z
